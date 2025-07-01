@@ -1,0 +1,6 @@
+---
+# Example configuration for google gemini pro (etc) API interaction
+
+outputFile: "output.txt" # default output file name, also saved to history
+modelName: "gemini-2.5-pro"
+apiKey: "xxxxxxxxx"
