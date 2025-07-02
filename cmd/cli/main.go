@@ -1,3 +1,5 @@
+// cli is a programme for working interactively with the Genesis 2.5 api
+// to make the most of the large token window provided by Genesis.
 package main
 
 import (
@@ -7,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/generative-ai-go/genai"
+	"github.com/rorycl/genact"
 )
 
 func main() {
@@ -32,12 +35,12 @@ func main() {
 	// load history if required
 	history := []*genai.Content{}
 	if options.APIHistory != "" {
-		history, err = HistoryAPIToAIContent(options.APIHistory)
+		history, err = genact.HistoryAPIToAIContent(options.APIHistory)
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else if options.StudioHistory != "" {
-		history, err = HistoryStudioToAIContent(options.StudioHistory)
+		history, err = genact.HistoryStudioToAIContent(options.StudioHistory)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -50,7 +53,7 @@ func main() {
 	}
 
 	// run api
-	response, err := APIGetResponse(settings, history, string(prompt))
+	response, err := genact.APIGetResponse(settings, history, string(prompt))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,15 +67,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = files.WriteOutput([]byte(response.latestResponse))
+	err = files.WriteOutput([]byte(response.LatestResponse))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = files.WriteHistory([]byte(response.fullHistory))
+	err = files.WriteHistory([]byte(response.FullHistory))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("finished in %s, token count %d\n", time.Now().Sub(start), response.tokenCount)
+	fmt.Printf("finished in %s, token count %d\n", time.Since(start), response.TokenCount)
 
 }

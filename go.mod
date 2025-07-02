@@ -1,4 +1,4 @@
-module github.com/rorycl/genai
+module github.com/rorycl/genact
 
 go 1.24
 

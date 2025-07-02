@@ -1,4 +1,11 @@
-package main
+// Package genact provides a way for interacting with the Google Genesis
+// AI API for text only prompts using the text chat interface. This
+// module provides a simple mechanism for sending prompts and recorded
+// history (if applicable) and receiving a response and the new history,
+// suitable for iterative interactions with Genesis Pro 2.5 taking
+// advantage of the large Genesis token window.
+// window
+package genact
 
 import (
 	"context"
@@ -13,9 +20,9 @@ import (
 )
 
 type ApiResponse struct {
-	tokenCount     int32
-	latestResponse string
-	fullHistory    string
+	TokenCount     int32
+	LatestResponse string
+	FullHistory    string
 }
 
 // local debugging
@@ -69,12 +76,12 @@ func runAPI(ctx context.Context, chat *genai.ChatSession, history []*genai.Conte
 // ApiResponse struct for easier handling. Presently only the first
 // Candidate is considered (resp.Candidates[0]).
 //
-// Todo: deal with "isThinking" responses from the AI API, which may not
-// be useful to put into history.
+// Todo: deal with "isThinking"/"Thinking" responses from the AI API,
+// which may not be useful to put into history.
 func parseResponse(chat *genai.ChatSession, resp *genai.GenerateContentResponse) (*ApiResponse, error) {
 
 	thisResponse := ApiResponse{
-		tokenCount: resp.UsageMetadata.PromptTokenCount,
+		TokenCount: resp.UsageMetadata.PromptTokenCount,
 	}
 
 	// expecting only 1 candidate in this code
@@ -82,23 +89,23 @@ func parseResponse(chat *genai.ChatSession, resp *genai.GenerateContentResponse)
 		return nil, fmt.Errorf("expected only 1 candidate, got %d", len(resp.Candidates))
 	}
 
-	var latestResponse strings.Builder
+	var LatestResponse strings.Builder
 	for _, part := range resp.Candidates[0].Content.Parts {
 		if txt, ok := part.(genai.Text); ok {
-			latestResponse.WriteString(string(txt))
+			LatestResponse.WriteString(string(txt))
 		}
 	}
-	thisResponse.latestResponse = latestResponse.String()
-	if thisResponse.latestResponse == "" {
+	thisResponse.LatestResponse = LatestResponse.String()
+	if thisResponse.LatestResponse == "" {
 		return nil, errors.New("latest response had no text content")
 	}
 
-	fullHistory := chat.History
-	historyJSON, err := json.MarshalIndent(fullHistory, "", "  ")
+	FullHistory := chat.History
+	historyJSON, err := json.MarshalIndent(FullHistory, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("Failed to marshal new history: %v", err)
 	}
-	thisResponse.fullHistory = string(historyJSON)
+	thisResponse.FullHistory = string(historyJSON)
 	return &thisResponse, nil
 }
 

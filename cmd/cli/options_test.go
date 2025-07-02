@@ -16,6 +16,9 @@ func TestOptions(t *testing.T) {
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
+
+	t.Chdir("../..")
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("could not get current working directory: %s", err)

@@ -1,4 +1,4 @@
-package main
+package genact
 
 import (
 	"encoding/json"
