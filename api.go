@@ -102,18 +102,18 @@ func parseResponse(chat *genai.ChatSession, resp *genai.GenerateContentResponse)
 	return &thisResponse, nil
 }
 
-// GetAPIResponse creates a genai client and chat session, runs the api
+// APIGetResponse creates a genai client and chat session, runs the api
 // to receive a response, and then puts the response into a local
 // ApiResponse struct for convenient processing.
-func GetAPIResponse(settings map[string]string, history []*genai.Content, prompt string) (*ApiResponse, error) {
+func APIGetResponse(settings map[string]string, history []*genai.Content, prompt string) (*ApiResponse, error) {
 	ctx := context.Background()
 	client, chat, err := startChat(ctx, settings)
+	defer endChat(client)
 	if err != nil {
 		return nil, fmt.Errorf("could not start chat: %w", err)
 	}
 	response, err := runAPI(ctx, chat, history, prompt)
 	if err != nil {
-		endChat(client)
 		return nil, fmt.Errorf("chat response error: %w", err)
 	}
 	return parseResponse(chat, response)

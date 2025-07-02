@@ -34,21 +34,21 @@ func TestFiles(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	files, err = newFiles(tmpDir, "chat1")
+	files, err = NewFiles(tmpDir, "chat1")
 
 	b := []byte("hi there")
 
-	err = files.writePrompt(b)
+	err = files.WritePrompt(b)
 	if err != nil {
 		t.Fatalf("writePrompt error %s", err)
 	}
 
-	err = files.writeOutput(b)
+	err = files.WriteOutput(b)
 	if err != nil {
 		t.Fatalf("writePrompt error %s", err)
 	}
 
-	err = files.writeHistory(b)
+	err = files.WriteHistory(b)
 	if err != nil {
 		t.Fatalf("writePrompt error %s", err)
 	}
