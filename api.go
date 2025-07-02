@@ -98,7 +98,7 @@ func parseResponse(chat *genai.ChatSession, resp *genai.GenerateContentResponse)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to marshal new history: %v", err)
 	}
-	thisResponse.fullHistory = historyJSON
+	thisResponse.fullHistory = string(historyJSON)
 	return &thisResponse, nil
 }
 

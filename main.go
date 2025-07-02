@@ -13,8 +13,14 @@ func main() {
 
 	start := time.Now()
 
+	// options
+	options, err := ParseOptions()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// settings
-	f, err := os.ReadFile("settings_example.yaml")
+	f, err := os.ReadFile(options.YamlFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,21 +29,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// options
-	options, err := ParseOptions()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// load history if required
 	history := []*genai.Content{}
 	if options.APIHistory != "" {
-		history, err := HistoryAPIToAIContent(options.APIHistory)
+		history, err = HistoryAPIToAIContent(options.APIHistory)
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else if options.StudioHistory != "" {
-		history, err := HistoryStudioToAIContent(options.StudioHistory)
+		history, err = HistoryStudioToAIContent(options.StudioHistory)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -73,6 +73,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("finished in %s, token count %d\n", t.Now().Sub(start), response.tokenCount)
+	fmt.Printf("finished in %s, token count %d\n", time.Now().Sub(start), response.tokenCount)
 
 }
