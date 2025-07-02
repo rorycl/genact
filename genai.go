@@ -178,6 +178,10 @@ func main() {
 	}
 
 	// 6. Process the response and extract the latest message
+	log.Printf("Response ok, total token count %d", resp.UsageMetadata.PromptTokenCount)
+	if resp.PromptFeedback != nil && resp.PromptFeedback.BlockReason > 0 {
+		log.Fatalf("Received BlockReason: %d", resp.PromptFeedback.BlockReason)
+	}
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
 		log.Fatal("Received an empty response from the API.")
 	}

@@ -11,8 +11,10 @@ import (
 
 // AIStudioChunk represents a single turn in the conversation from the export file.
 type AIStudioChunk struct {
-	Text string `json:"text"`
-	Role string `json:"role"`
+	Text       string `json:"text"`
+	Role       string `json:"role"`
+	IsThought  bool   `json:"isThought"`
+	TokenCount int32  `json:"tokenCount"`
 	// ignore other fields.
 }
 
@@ -47,6 +49,9 @@ func aiStudioToAIContent(studioChunks []AIStudioChunk) ([]*genai.Content, error)
 	contents := []*genai.Content{}
 	for _, thisContent := range studioChunks {
 		if thisContent.Text == "" {
+			continue
+		}
+		if thisContent.IsThought { // we aren't loading thoughts
 			continue
 		}
 		c := genai.Content{}

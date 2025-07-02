@@ -12,7 +12,7 @@ func TestHistoryStudio(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(h), 35; got != want {
+	if got, want := len(h), 23; got != want { // 12 additional are thoughts
 		t.Errorf("got %d want %d contents", got, want)
 	}
 }

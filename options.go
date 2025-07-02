@@ -62,10 +62,10 @@ type CmdOptions struct {
 	withoutHistory bool
 
 	// paths
-	historyDirPath       string // path under Directory for conversations
-	historyDirPathExists bool
-	chatDirPath          string // path under Directory/conversations for this chat
-	chatDirPathExists    bool
+	conversationDirPath       string // path under Directory for conversations
+	conversationDirPathExists bool
+	chatDirPath               string // path under Directory/conversations for this chat
+	chatDirPathExists         bool
 
 	// prompt
 	promptFile string // options.Args.Prompt is copied here
@@ -137,13 +137,14 @@ func ParseOptions() (*CmdOptions, error) {
 
 	// directory check
 	if options.Directory == "" || options.Directory == "current working directory" {
+		var err error
 		options.Directory, err = os.Getwd()
 		if err != nil {
 			return nil, fmt.Errorf("could not get current working directory: %s", err)
 		}
 	} else {
 		if !checkDirExists(options.Directory) {
-			return nil, fmt.Errorf("could not find directory %s: %s", options.Directory, err)
+			return nil, fmt.Errorf("could not find directory %s", options.Directory)
 		}
 	}
 
@@ -152,8 +153,8 @@ func ParseOptions() (*CmdOptions, error) {
 		return nil, errors.New("chat name must be specified")
 	}
 	options.Chat = strings.ReplaceAll(strings.ToLower(strings.TrimSpace(options.Chat)), " ", "_")
-	if strings.Contains(options.Chat, filepath.Separator) {
-		return nil, fmt.Errorf("chat name %s cannot contain path separator %s", options.Chat, filepath.Separator)
+	if strings.ContainsRune(options.Chat, filepath.Separator) {
+		return nil, fmt.Errorf("chat name %s cannot contain path separator %q", options.Chat, filepath.Separator)
 	}
 
 	// prompt
@@ -163,9 +164,9 @@ func ParseOptions() (*CmdOptions, error) {
 	options.promptFile = options.Args.Prompt
 
 	// construct and check paths
-	options.historyDirPath = filepath.Clean(filepath.Join(options.Directory, historyDir))
-	options.historyDirPathExists = checkDirExists(options.historyDirPath)
-	options.chatDirPath = filepath.Clean(filepath.Join(options.historyDirPath, options.Chat))
+	options.conversationDirPath = filepath.Clean(filepath.Join(options.Directory, historyDir))
+	options.conversationDirPathExists = checkDirExists(options.conversationDirPath)
+	options.chatDirPath = filepath.Clean(filepath.Join(options.conversationDirPath, options.Chat))
 	options.chatDirPathExists = checkDirExists(options.chatDirPath)
 
 	return &options, nil
