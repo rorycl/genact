@@ -28,6 +28,7 @@ type ApiResponse struct {
 // local debugging
 var logging bool = true
 
+// startChat starts a client/model/chat.
 func startChat(ctx context.Context, settings map[string]string) (*genai.Client, *genai.ChatSession, error) {
 	client, err := genai.NewClient(ctx, option.WithAPIKey(settings["apiKey"]))
 	if err != nil {
@@ -38,6 +39,7 @@ func startChat(ctx context.Context, settings map[string]string) (*genai.Client, 
 	return client, chat, nil
 }
 
+// endChat closes a client session.
 func endChat(client *genai.Client) {
 	client.Close()
 }

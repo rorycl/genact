@@ -15,8 +15,8 @@ type APIJsonContent struct {
 	Parts []string `json:"Parts,omitempty"`
 }
 
-// readAPIHistory reads json history from an AI API history file.
-func readAPIHistory(filePath string) ([]APIJsonContent, error) {
+// ReadAPIHistory reads json history from an AI API history file.
+func ReadAPIHistory(filePath string) ([]APIJsonContent, error) {
 	var previousHistory []APIJsonContent
 	historyBytes, err := os.ReadFile(filePath)
 	if err != nil {
@@ -55,7 +55,7 @@ func apiToAIContent(jc []APIJsonContent) ([]*genai.Content, error) {
 // HistoryAPIToAIContent parses an AI API history file from Google
 // Gemini into a slice of *genai.Content, or error.
 func HistoryAPIToAIContent(filePath string) ([]*genai.Content, error) {
-	aiAPIExport, err := readAPIHistory(filePath)
+	aiAPIExport, err := ReadAPIHistory(filePath)
 	if err != nil {
 		return nil, err
 	}
