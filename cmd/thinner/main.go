@@ -7,8 +7,11 @@ import (
 	"strings"
 )
 
+// glowPath is the path to the "glow" binary.
+// See https://github.com/charmbracelet/glow
 var glowPath string
 
+// run glow with pager with a display width of 180 chars
 func runCommand(s string) {
 	cmd := exec.Command(glowPath, "-w", "180", "-p")
 	cmd.Stdin = strings.NewReader(s)
@@ -20,20 +23,22 @@ func runCommand(s string) {
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("please provide a history file to parse")
+
+	options, err := ParseOptions()
+	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	// find "glow"
-	var err error
 	glowPath, err = exec.LookPath("glow")
 	if err != nil {
 		fmt.Printf("glow could not be found: %v", err)
+		os.Exit(1)
 	}
 
 	// load conversation
-	conversations, err := NewConversations(os.Args[1])
+	conversations, err := NewConversations(options.inputFile)
 	if err != nil {
 		fmt.Printf("could not load history file: %v", err)
 		os.Exit(1)
@@ -54,23 +59,17 @@ func main() {
 	// compact the conversations
 	conversations.Compact()
 
-	// save to file
-	tf, err := os.CreateTemp("", "genact_conv_*.json")
-	if err != nil {
-		fmt.Printf("temporary file creation error %v\n", err)
-		os.Exit(1)
-	}
-
+	// serialize output to json
 	output, err := conversations.Serialize()
 	if err != nil {
 		fmt.Printf("serialization error: %v\n", err)
 		os.Exit(1)
 	}
-	_, err = tf.Write(output)
+
+	// write to file
+	_, err = options.output.Write(output)
 	if err != nil {
 		fmt.Println(err)
 	}
-
-	_ = tf.Close()
-
+	_ = options.output.Close()
 }
