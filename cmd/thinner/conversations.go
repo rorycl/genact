@@ -12,7 +12,7 @@ import (
 )
 
 // conversations are the components of a history file, normally the user
-// conversing with the agent in user/agent pairs. Sometimes there might
+// conversing with the agent in user/model pairs. Sometimes there might
 // be more than one agent response, when one of the agent pairs is a
 // "thinking" record.
 //
@@ -25,10 +25,10 @@ import (
 // "history" file for providing back to the genesis api for further
 // conversation rounds.
 
-// conversation is a single user/agent conversation.
+// conversation is a single user/agent ("model") conversation.
 type conversation struct {
 	User     string
-	Agent    []string
+	Model    []string
 	Idx      int
 	agentLen int
 }
@@ -37,7 +37,7 @@ func (co conversation) String() string {
 	output := "\n`user`:\n\n"
 	output += co.User
 	output += "\n\n---\n\n`agent`:\n\n"
-	output += strings.Join(co.Agent, "\n\n--\n\n")
+	output += strings.Join(co.Model, "\n\n--\n\n")
 	return output
 }
 
@@ -131,7 +131,7 @@ func (c *Conversations) Serialize() ([]byte, error) {
 	}
 	for _, conv := range c.conversations {
 		addContent("user", []string{conv.User})
-		addContent("agent", conv.Agent)
+		addContent("model", conv.Model)
 	}
 	return json.MarshalIndent(ajc, "", "  ")
 }
@@ -155,7 +155,7 @@ func NewConversations(filePath string) (*Conversations, error) {
 			}
 			conv.User = strings.Join(h.Parts, "\n\n--\n\n")
 		} else { // agent
-			conv.Agent = h.Parts
+			conv.Model = h.Parts
 			conv.agentLen = len(h.Parts)
 		}
 	}
