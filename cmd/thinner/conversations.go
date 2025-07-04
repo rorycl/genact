@@ -45,9 +45,10 @@ func (co conversation) String() string {
 // in time order.
 type Conversations struct {
 	conversations []conversation
-	keep          []int // indexes to keep
-	compactRun    bool  // has index thinning occurred?
-	reversed      bool  // has conversations been reversed?
+	keep          []int        // indexes to keep
+	compactRun    bool         // has index thinning occurred?
+	reversed      bool         // has conversations been reversed?
+	itemsToReview map[int]bool // only review these items
 }
 
 // Reverse reverses the order of the conversations slice.
@@ -61,10 +62,49 @@ func (c *Conversations) Len() int {
 	return len(c.conversations)
 }
 
+// ReviewItems sets the list of conversations to review by idx. Items
+// with a negative index are replaced with the relevant item from the
+// end of the slice of conversation.
+func (c *Conversations) ReviewItems(ri []int) error {
+	c.itemsToReview = map[int]bool{}
+	for _, idx := range ri {
+		if idx < 0 {
+			i := len(c.conversations) + idx
+			if i < 0 {
+				return fmt.Errorf("item %d out of range len %d", idx, len(c.conversations))
+			}
+			c.itemsToReview[i] = true
+			continue
+		}
+		if idx > len(c.conversations)-1 {
+			return fmt.Errorf("item %d out of range len %d", idx, len(c.conversations))
+		}
+		c.itemsToReview[idx] = true
+	}
+	return nil
+}
+
+// reviewOK returns true if the itemsToReview is empty (which means all
+// the items in conversations.conversations should be used) or if it
+// matches a provided item to review, else false.
+func (c *Conversations) reviewOK(idx int) bool {
+	if c.itemsToReview == nil || len(c.itemsToReview) == 0 {
+		return true
+	}
+	if _, ok := c.itemsToReview[idx]; ok {
+		return true
+	}
+	return false
+}
+
 // Iter returns the natural sequence of conversation
 func (c *Conversations) Iter() iter.Seq[conversation] {
 	return func(yield func(conversation) bool) {
 		for _, conv := range c.conversations {
+			if !c.reviewOK(conv.Idx) {
+				c.Keep(conv.Idx)
+				continue
+			}
 			if !yield(conv) {
 				return
 			}

@@ -83,3 +83,42 @@ func TestConversations(t *testing.T) {
 	fmt.Println(string(json))
 
 }
+
+func TestConversationsReview(t *testing.T) {
+
+	file := "../../testdata/api-history-tennis.json"
+	conversations, err := NewConversations(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = conversations.ReviewItems([]int{5})
+	if err == nil {
+		t.Fatal("unexpected nil error fo ReviewItems(5)")
+	}
+	err = conversations.ReviewItems([]int{-5})
+	if err == nil {
+		t.Fatal("unexpected nil error fo ReviewItems(-5)")
+	}
+	err = conversations.ReviewItems([]int{0, -1})
+	if err != nil {
+		t.Fatalf("unexpected error fo ReviewItems(0, -1) %v", err)
+	}
+
+	if diff := cmp.Diff(conversations.itemsToReview, map[int]bool{0: true, 3: true}); diff != "" {
+		t.Errorf("itemsToReview mismatch (-want +got):\n%s", diff)
+	}
+
+	counter := 0
+	for _ = range conversations.Iter() {
+		counter++
+	}
+	if got, want := counter, 2; got != want {
+		t.Errorf("got %d want %d iter items", got, want)
+	}
+	conversations.Compact()
+	if got, want := conversations.Len(), 2; got != want {
+		t.Errorf("got %d want %d len items", got, want)
+	}
+
+}

@@ -22,23 +22,6 @@ func runCommand(s string) {
 	}
 }
 
-// conversationInReview is a closure returning a func which returns true
-// if the provided conversation is in the review list (if indeed a
-// review list is provided, otherwise it always returns true.)
-func conversationInReview(review []int) func(idx int) bool {
-	return func(idx int) bool {
-		if len(review) == 0 {
-			return true
-		}
-		for _, r := range review {
-			if r == idx {
-				return true
-			}
-		}
-		return false
-	}
-}
-
 func main() {
 
 	options, err := ParseOptions()
@@ -64,14 +47,11 @@ func main() {
 	// reverse the file
 	conversations.Reverse()
 
-	// initialise review closure
-	inReview := conversationInReview(options.Review)
+	// initialise review items, if any
+	conversations.ReviewItems(options.Review)
 
 	// iterate over conversations
 	for c := range conversations.Iter() {
-		if !inReview(c.Idx) {
-			continue
-		}
 		content := fmt.Sprint(c)
 		runCommand(content)
 		if question() {
