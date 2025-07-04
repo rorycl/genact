@@ -12,7 +12,7 @@ const (
 	Version string = "0.0.1" // program version
 )
 
-var usage string = fmt.Sprintf(`[-o outputFile] historyFile.json
+var usage string = fmt.Sprintf(`[-o outputFile] [-r 1, -r 3...] historyFile.json
 
 version %s
 
@@ -25,11 +25,15 @@ recompiled in the original order.
 This uses bubbletea's "glow" markdown pager programme, which needs to be
 on your PATH.
 
+Using the -r/--review flag only reviews the (0-indexed) conversations
+numbered.
+
 `, Version)
 
 // CmdOptions are flag options which consume os.Args input.
 type CmdOptions struct {
 	OutputFile string `short:"o" long:"outputFile" required:"true" description:"file path to save output"`
+	Review     []int  `short:"r" long:"review" description:"list of specific conversation pairs to review"`
 	output     *os.File
 	inputFile  string
 	Args       struct {
