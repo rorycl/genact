@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"slices"
 	"strings"
 
@@ -27,8 +29,16 @@ import (
 type conversation struct {
 	User     string
 	Agent    []string
-	idx      int
+	Idx      int
 	agentLen int
+}
+
+func (co conversation) String() string {
+	output := "\n`user`:\n\n"
+	output += co.User
+	output += "\n\n---\n\n`agent`:\n\n"
+	output += strings.Join(co.Agent, "\n\n--\n\n")
+	return output
 }
 
 // Conversations is a collection of user/agent conversation interactions
@@ -49,6 +59,17 @@ func (c *Conversations) Reverse() {
 // Len returns the length of conversations
 func (c *Conversations) Len() int {
 	return len(c.conversations)
+}
+
+// Iter returns the natural sequence of conversation
+func (c *Conversations) Iter() iter.Seq[conversation] {
+	return func(yield func(conversation) bool) {
+		for _, conv := range c.conversations {
+			if !yield(conv) {
+				return
+			}
+		}
+	}
 }
 
 // Get gets a conversation by idx
@@ -102,22 +123,17 @@ func (c *Conversations) Compact() {
 }
 
 // Serialize serializes a conversations to json after conversion to a
-// slice of APIJsonContent.
-//
-//	type APIJsonContent struct {
-//		Role  string   `json:"Role"`
-//		Parts []string `json:"Parts,omitempty"`
-//	}
+// slice of genact.APIJsonContent.
 func (c *Conversations) Serialize() ([]byte, error) {
 	ajc := []genact.APIJsonContent{}
 	addContent := func(role string, parts []string) {
-		ajc = append(ajc, APIJsonContent{role, parts})
+		ajc = append(ajc, genact.APIJsonContent{role, parts})
 	}
 	for _, conv := range c.conversations {
 		addContent("user", []string{conv.User})
 		addContent("agent", conv.Agent)
 	}
-
+	return json.MarshalIndent(ajc, "", "  ")
 }
 
 // NewConversations reads a json history API file from disk and converts
@@ -129,13 +145,13 @@ func NewConversations(filePath string) (*Conversations, error) {
 	}
 	conversations := Conversations{}
 	idx := 0
-	conv := conversation{idx: idx}
+	conv := conversation{Idx: idx}
 	for _, h := range history {
 		if h.Role == "user" {
 			if conv.User != "" {
 				conversations.conversations = append(conversations.conversations, conv)
 				idx++
-				conv = conversation{idx: idx}
+				conv = conversation{Idx: idx}
 			}
 			conv.User = strings.Join(h.Parts, "\n\n--\n\n")
 		} else { // agent

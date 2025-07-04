@@ -3,21 +3,19 @@ package main
 import (
 	"fmt"
 	"os"
-
-	"github.com/rorycl/genact"
+	"os/exec"
+	"strings"
 )
 
-func question() int {
-	var response string
-    _, err := fmt.Scanln(&response)
-	response = strings.ToLower(strings.TrimSpace(response))
-	switch {
-		case strings.Contains(response, "y"):
-		return 0
-		case strings.Contains(response, "l"):
-		return 1
-		default:
-		return -1
+var glowPath string
+
+func runCommand(s string) {
+	cmd := exec.Command(glowPath, "-w", "180", "-p")
+	cmd.Stdin = strings.NewReader(s)
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("command error: ", err)
 	}
 }
 
@@ -26,25 +24,53 @@ func main() {
 		fmt.Println("please provide a history file to parse")
 		os.Exit(1)
 	}
-	history, err := genact.ReadAPIHistory(os.Args[1])
+
+	// find "glow"
+	var err error
+	glowPath, err = exec.LookPath("glow")
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("glow could not be found: %v", err)
+	}
+
+	// load conversation
+	conversations, err := NewConversations(os.Args[1])
+	if err != nil {
+		fmt.Printf("could not load history file: %v", err)
 		os.Exit(1)
 	}
 
-	SavedHistory := []APIJsonContent
+	// reverse the file
+	conversations.Reverse()
 
-	var builder strings.Builder
-	indexes := []int{}
-	for i, entry := range history {
-		if entry.Role == "user" {
-			if builder.Len() > 0 {
-				// show
-			}
-
-		fmt.Println("------------")
-		fmt.Println(i, entry.Role)
-		fmt.Println(entry.Parts)
+	// iterate over conversations
+	for c := range conversations.Iter() {
+		content := fmt.Sprint(c)
+		runCommand(content)
+		if question() {
+			conversations.Keep(c.Idx)
+		}
 	}
+
+	// compact the conversations
+	conversations.Compact()
+
+	// save to file
+	tf, err := os.CreateTemp("", "genact_conv_*.json")
+	if err != nil {
+		fmt.Printf("temporary file creation error %v\n", err)
+		os.Exit(1)
+	}
+
+	output, err := conversations.Serialize()
+	if err != nil {
+		fmt.Printf("serialization error: %v\n", err)
+		os.Exit(1)
+	}
+	_, err = tf.Write(output)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	_ = tf.Close()
 
 }

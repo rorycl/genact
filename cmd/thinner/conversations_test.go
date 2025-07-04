@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -22,7 +23,12 @@ func TestConversations(t *testing.T) {
 	conversations.Reverse()
 	last := conversations.Get(0) // retrieved by original index
 
-	if got, want := first.idx, last.idx; got != want {
+	strOutput := fmt.Sprint(last)
+	if !strings.Contains(strOutput, "`agent`:") {
+		t.Error("last item string output did not include `agent`")
+	}
+
+	if got, want := first.Idx, last.Idx; got != want {
 		t.Errorf("got %d should equal %d after reverse", got, want)
 	}
 	if got, want := conversations.reversed, true; got != want {
@@ -54,11 +60,26 @@ func TestConversations(t *testing.T) {
 
 	indexes := []int{}
 	for _, c := range conversations.conversations {
-		indexes = append(indexes, c.idx)
+		indexes = append(indexes, c.Idx)
 	}
 
 	if diff := cmp.Diff(indexes, []int{1, 2}); diff != "" {
 		t.Errorf("indexes mismatch (-want +got):\n%s", diff)
 	}
+
+	indexes = []int{}
+	for c := range conversations.Iter() {
+		indexes = append(indexes, c.Idx)
+	}
+
+	if diff := cmp.Diff(indexes, []int{1, 2}); diff != "" {
+		t.Errorf("indexes mismatch (-want +got):\n%s", diff)
+	}
+
+	json, err := conversations.Serialize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(json))
 
 }
