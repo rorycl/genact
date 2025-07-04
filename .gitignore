@@ -1,2 +1,4 @@
 genact
 cmd/cli/settings.yaml
+cmd/cli/genact
+cmd/thinner/thinner
