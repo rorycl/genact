@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -28,7 +30,10 @@ func main() {
 
 	options, err := ParseOptions()
 	if err != nil {
-		fmt.Println(err)
+		var pe ParserError
+		if !errors.As(err, &pe) {
+			log.Fatal(err)
+		}
 		os.Exit(1)
 	}
 

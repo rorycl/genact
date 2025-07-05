@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -19,7 +20,11 @@ func main() {
 	// options
 	options, err := ParseOptions()
 	if err != nil {
-		log.Fatal(err)
+		var pe ParserError
+		if !errors.As(err, &pe) {
+			log.Fatal(err)
+		}
+		os.Exit(1)
 	}
 
 	// settings
