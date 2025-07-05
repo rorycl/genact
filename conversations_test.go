@@ -1,4 +1,4 @@
-package main
+package genact
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 
 func TestConversations(t *testing.T) {
 
-	file := "../../testdata/api-history-tennis.json"
+	file := "testdata/api-history-tennis.json"
 	conversations, err := NewConversations(file)
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func TestConversations(t *testing.T) {
 
 func TestConversationsReview(t *testing.T) {
 
-	file := "../../testdata/api-history-tennis.json"
+	file := "testdata/api-history-tennis.json"
 	conversations, err := NewConversations(file)
 	if err != nil {
 		t.Fatal(err)

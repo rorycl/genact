@@ -1,4 +1,4 @@
-package main
+package genact
 
 import (
 	"encoding/json"
@@ -7,11 +7,31 @@ import (
 	"iter"
 	"slices"
 	"strings"
-
-	"github.com/rorycl/genact"
 )
 
-// conversations are the components of a history file, normally the user
+// conversation is a record of single user/agent ("model") conversation
+// interaction.
+type conversation struct {
+	User     string
+	Model    []string
+	Idx      int
+	agentLen int
+}
+
+// String is a string representation of a conversation, suitable for
+// piping to a markdown reader such as "glow".
+func (co conversation) String() string {
+	output := "\n`user`:\n\n"
+	output += co.User
+	output += "\n\n---\n\n`agent`:\n\n"
+	output += strings.Join(co.Model, "\n\n--\n\n")
+	return output
+}
+
+// Conversations is a collection of user/agent(model) conversation
+// interactions recorded in time order.
+//
+// Conversations are the components of a history file, normally the user
 // conversing with the agent in user/model pairs. Sometimes there might
 // be more than one agent response, when one of the agent pairs is a
 // "thinking" record.
@@ -24,25 +44,6 @@ import (
 // The resulting Conversations slice can be serialized to a json
 // "history" file for providing back to the genesis api for further
 // conversation rounds.
-
-// conversation is a single user/agent ("model") conversation.
-type conversation struct {
-	User     string
-	Model    []string
-	Idx      int
-	agentLen int
-}
-
-func (co conversation) String() string {
-	output := "\n`user`:\n\n"
-	output += co.User
-	output += "\n\n---\n\n`agent`:\n\n"
-	output += strings.Join(co.Model, "\n\n--\n\n")
-	return output
-}
-
-// Conversations is a collection of user/agent conversation interactions
-// in time order.
 type Conversations struct {
 	conversations []conversation
 	keep          []int        // indexes to keep
@@ -57,7 +58,7 @@ func (c *Conversations) Reverse() {
 	c.reversed = !c.reversed
 }
 
-// Len returns the length of conversations
+// Len returns the length of conversations.
 func (c *Conversations) Len() int {
 	return len(c.conversations)
 }
@@ -163,11 +164,11 @@ func (c *Conversations) Compact() {
 }
 
 // Serialize serializes a conversations to json after conversion to a
-// slice of genact.APIJsonContent.
+// slice of APIJsonContent.
 func (c *Conversations) Serialize() ([]byte, error) {
-	ajc := []genact.APIJsonContent{}
+	ajc := []APIJsonContent{}
 	addContent := func(role string, parts []string) {
-		ajc = append(ajc, genact.APIJsonContent{role, parts})
+		ajc = append(ajc, APIJsonContent{role, parts})
 	}
 	for _, conv := range c.conversations {
 		addContent("user", []string{conv.User})
@@ -179,7 +180,7 @@ func (c *Conversations) Serialize() ([]byte, error) {
 // NewConversations reads a json history API file from disk and converts
 // it into a slice of Conversation.
 func NewConversations(filePath string) (*Conversations, error) {
-	history, err := genact.ReadAPIHistory(filePath)
+	history, err := ReadAPIHistory(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read file: %w", err)
 	}
@@ -194,7 +195,7 @@ func NewConversations(filePath string) (*Conversations, error) {
 				conv = conversation{Idx: idx}
 			}
 			conv.User = strings.Join(h.Parts, "\n\n--\n\n")
-		} else { // agent
+		} else { // agent|model
 			conv.Model = h.Parts
 			conv.agentLen = len(h.Parts)
 		}

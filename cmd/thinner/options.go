@@ -17,7 +17,7 @@ var usage string = fmt.Sprintf(`[-o outputFile] [-r 1, -r 3...] historyFile.json
 version %s
 
 Interactively "thin" a gemini history file saved with genact by choosing
-which conversations from the history to include.
+which conversations from the history to output to a new history json file.
 
 Note that the conversations are replayed in reverse order, but
 recompiled in the original order.
@@ -26,8 +26,9 @@ This uses bubbletea's "glow" markdown pager programme, which needs to be
 on your PATH.
 
 Using the -r/--review flag only reviews the (0-indexed) conversations
-numbered.
-
+numbered, the other indexed items are kept. Negative indexing can be
+used to refer to items from the end of the list of conversations, so -1
+means the last item.
 `, Version)
 
 // CmdOptions are flag options which consume os.Args input.

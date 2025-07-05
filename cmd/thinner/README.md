@@ -14,7 +14,5 @@ history.
 
 The options for saving are:
 
-y : yes, save the segment
-l : yes, save the last part of the segment
-    (if there are more than 1 Agent responses, only grab the last one)
-n : no, don't save the sgement
+y : yes, save the conversation
+n : no, don't save the conversation

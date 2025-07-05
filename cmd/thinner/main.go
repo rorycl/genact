@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/rorycl/genact"
 )
 
 // glowPath is the path to the "glow" binary.
@@ -38,7 +40,7 @@ func main() {
 	}
 
 	// load conversation
-	conversations, err := NewConversations(options.inputFile)
+	conversations, err := genact.NewConversations(options.inputFile)
 	if err != nil {
 		fmt.Printf("could not load history file: %v", err)
 		os.Exit(1)
@@ -52,7 +54,7 @@ func main() {
 
 	// iterate over conversations
 	for c := range conversations.Iter() {
-		content := fmt.Sprint(c)
+		content := fmt.Sprint(c) // convert to string representation
 		runCommand(content)
 		if question() {
 			conversations.Keep(c.Idx)
