@@ -69,5 +69,5 @@ module-update-tidy:
 	go mod tidy ./...
 
 build:
-	cd ${CURDIR}/cmd/cli && go build -o ${CURDIR}/genact .
-	# go build .
+	go build -o bin/genact ./cmd/cli/
+	go build -o bin/thinner ./cmd/thinner/
