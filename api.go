@@ -12,7 +12,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/google/generative-ai-go/genai"
@@ -25,8 +27,16 @@ type ApiResponse struct {
 	FullHistory    string
 }
 
-// local debugging
-var logging bool = true
+var logger *log.Logger
+
+// initalise logging
+func NewLogger(enabled bool) {
+	writer := io.Discard
+	if enabled {
+		writer = os.Stdout
+	}
+	logger = log.New(writer, "", log.LstdFlags)
+}
 
 // startChat starts a client/model/chat.
 func startChat(ctx context.Context, settings map[string]string) (*genai.Client, *genai.ChatSession, error) {
@@ -48,16 +58,9 @@ func endChat(client *genai.Client) {
 // a prompt string.
 func runAPI(ctx context.Context, chat *genai.ChatSession, history []*genai.Content, prompt string) (*genai.GenerateContentResponse, error) {
 
-	logline := func(s string) {
-		if !logging {
-			return
-		}
-		log.Println(s)
-	}
-
 	chat.History = history
 
-	logline("Sending prompt to Gemini API...")
+	logger.Println("Sending prompt to Gemini API...")
 	resp, err := chat.SendMessage(ctx, genai.Text(prompt))
 	if err != nil {
 		return nil, fmt.Errorf("Failed to send message: %v", err)
@@ -68,7 +71,7 @@ func runAPI(ctx context.Context, chat *genai.ChatSession, history []*genai.Conte
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
 		return nil, errors.New("Received an empty response from the API.")
 	}
-	logline(fmt.Sprintf("Response ok, total token count %d", resp.UsageMetadata.PromptTokenCount))
+	logger.Println("Response ok")
 
 	return resp, nil
 }
@@ -115,6 +118,13 @@ func parseResponse(chat *genai.ChatSession, resp *genai.GenerateContentResponse)
 // to receive a response, and then puts the response into a local
 // ApiResponse struct for convenient processing.
 func APIGetResponse(settings map[string]string, history []*genai.Content, prompt string) (*ApiResponse, error) {
+
+	if settings == nil {
+		return nil, errors.New("settings not provided")
+	}
+	logging := !(settings["logging"] == "false")
+	NewLogger(logging)
+
 	ctx := context.Background()
 	client, chat, err := startChat(ctx, settings)
 	defer endChat(client)
