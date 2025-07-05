@@ -3,6 +3,17 @@
 A golang module and command line programs to interact with Google's
 Gemini large context window LLMs.
 
+The two cli programmes provided are:
+
+* `genact`\
+  interact with the gemini api, optionally providing history from a
+  saved ai studio or api history file, saving history to a structured
+  json file.
+
+* `thinner`\
+  an inventively-named program for thinning a history file to omit
+  user/model conversation pairs.
+
 ## cli
 
 See `cmd/cli/`: a cli to interact with genesis models.
