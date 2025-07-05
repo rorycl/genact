@@ -55,14 +55,20 @@ func main() {
 	conversations.Reverse()
 
 	// initialise review items, if any
-	conversations.ReviewItems(options.Review)
+	err = conversations.ReviewItems(options.Review)
+	if err != nil {
+		fmt.Printf("review items failed: %v", err)
+	}
 
 	// iterate over conversations
 	for c := range conversations.Iter() {
 		content := fmt.Sprint(c) // convert to string representation
 		runCommand(content)
 		if question() {
-			conversations.Keep(c.Idx)
+			err := conversations.Keep(c.Idx)
+			if err != nil {
+				fmt.Printf("conversation index %d could not be found: %v", c.Idx, err)
+			}
 		}
 	}
 

@@ -89,7 +89,7 @@ func (c *Conversations) ReviewItems(ri []int) error {
 // the items in conversations.conversations should be used) or if it
 // matches a provided item to review, else false.
 func (c *Conversations) reviewOK(idx int) bool {
-	if c.itemsToReview == nil || len(c.itemsToReview) == 0 {
+	if len(c.itemsToReview) == 0 {
 		return true
 	}
 	if _, ok := c.itemsToReview[idx]; ok {
@@ -103,7 +103,7 @@ func (c *Conversations) Iter() iter.Seq[conversation] {
 	return func(yield func(conversation) bool) {
 		for _, conv := range c.conversations {
 			if !c.reviewOK(conv.Idx) {
-				c.Keep(conv.Idx)
+				_ = c.Keep(conv.Idx)
 				continue
 			}
 			if !yield(conv) {

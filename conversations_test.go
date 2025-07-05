@@ -16,7 +16,7 @@ func TestConversations(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, want := conversations.Len(), 4; got != want {
-		fmt.Errorf("got %d want %d length conversation", got, want)
+		t.Errorf("got %d want %d length conversation", got, want)
 	}
 
 	first := conversations.Get(0)
@@ -55,7 +55,7 @@ func TestConversations(t *testing.T) {
 	conversations.Compact()
 
 	if got, want := conversations.Len(), 2; got != want {
-		fmt.Errorf("got %d want %d length conversation", got, want)
+		t.Errorf("got %d want %d length conversation", got, want)
 	}
 
 	indexes := []int{}
