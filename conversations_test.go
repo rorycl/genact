@@ -64,7 +64,7 @@ func TestConversations(t *testing.T) {
 	}
 
 	if diff := cmp.Diff(indexes, []int{1, 2}); diff != "" {
-		t.Errorf("indexes mismatch (-want +got):\n%s", diff)
+		t.Errorf("indexes mismatch (-got +want):\n%s", diff)
 	}
 
 	indexes = []int{}
@@ -73,7 +73,7 @@ func TestConversations(t *testing.T) {
 	}
 
 	if diff := cmp.Diff(indexes, []int{1, 2}); diff != "" {
-		t.Errorf("indexes mismatch (-want +got):\n%s", diff)
+		t.Errorf("indexes mismatch (-got +want):\n%s", diff)
 	}
 
 	json, err := conversations.Serialize()
@@ -94,15 +94,15 @@ func TestConversationsReview(t *testing.T) {
 
 	err = conversations.ReviewItems([]int{5})
 	if err == nil {
-		t.Fatal("unexpected nil error fo ReviewItems(5)")
+		t.Fatal("unexpected nil error for ReviewItems(5)")
 	}
 	err = conversations.ReviewItems([]int{-5})
 	if err == nil {
-		t.Fatal("unexpected nil error fo ReviewItems(-5)")
+		t.Fatal("unexpected nil error for ReviewItems(-5)")
 	}
 	err = conversations.ReviewItems([]int{0, -1})
 	if err != nil {
-		t.Fatalf("unexpected error fo ReviewItems(0, -1) %v", err)
+		t.Fatalf("unexpected error for ReviewItems(0, -1) %v", err)
 	}
 
 	if diff := cmp.Diff(conversations.itemsToReview, map[int]bool{0: true, 3: true}); diff != "" {
@@ -119,6 +119,71 @@ func TestConversationsReview(t *testing.T) {
 	conversations.Compact()
 	if got, want := conversations.Len(), 2; got != want {
 		t.Errorf("got %d want %d len items", got, want)
+	}
+
+}
+
+func TestConversationsKeep(t *testing.T) {
+
+	file := "testdata/api-history-tennis.json"
+	conversations, err := NewConversations(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = conversations.KeepItems([]int{0, 2})
+	if err != nil {
+		t.Fatalf("unexpected error for KeepItems(0, 2) %v", err)
+	}
+
+	counter := 0
+	for _ = range conversations.Iter() {
+		counter++
+	}
+	if got, want := counter, 0; got != want {
+		t.Errorf("got %d want %d iter items", got, want)
+	}
+	conversations.Compact()
+	if got, want := conversations.Len(), 2; got != want {
+		t.Errorf("got %d want %d len items", got, want)
+	}
+
+}
+
+func TestConversationsKeepAndReview(t *testing.T) {
+
+	file := "testdata/api-history-tennis.json"
+	conversations, err := NewConversations(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = conversations.ReviewItems([]int{-1})
+	if err != nil {
+		t.Fatalf("unexpected error for ReviewItems(-1) %v", err)
+	}
+
+	err = conversations.KeepItems([]int{0})
+	if err != nil {
+		t.Fatalf("unexpected error for KeepItems(0) %v", err)
+	}
+
+	counter := 0
+	for c := range conversations.Iter() {
+		_ = conversations.Keep(c.Idx) // keep the review item
+		counter++
+	}
+	if got, want := counter, 1; got != want {
+		t.Errorf("got %d want %d iter items", got, want)
+	}
+
+	conversations.Compact()
+
+	if got, want := conversations.Len(), 2; got != want {
+		t.Errorf("got %d want %d len items", got, want)
+	}
+	if diff := cmp.Diff(conversations.keep, []int{0, 3}); diff != "" {
+		t.Errorf("conversations.keep mismatch (-got +want):\n%s", diff)
 	}
 
 }

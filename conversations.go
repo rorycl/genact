@@ -50,6 +50,7 @@ type Conversations struct {
 	compactRun    bool         // has index thinning occurred?
 	reversed      bool         // has conversations been reversed?
 	itemsToReview map[int]bool // only review these items
+	itemsToKeep   map[int]bool // preset items to keep
 }
 
 // Reverse reverses the order of the conversations slice.
@@ -65,7 +66,8 @@ func (c *Conversations) Len() int {
 
 // ReviewItems sets the list of conversations to review by idx. Items
 // with a negative index are replaced with the relevant item from the
-// end of the slice of conversation.
+// end of the slice of conversation. ReviewItems are only relevant to
+// the Iter main review iterator.
 func (c *Conversations) ReviewItems(ri []int) error {
 	c.itemsToReview = map[int]bool{}
 	for _, idx := range ri {
@@ -85,26 +87,86 @@ func (c *Conversations) ReviewItems(ri []int) error {
 	return nil
 }
 
-// reviewOK returns true if the itemsToReview is empty (which means all
-// the items in conversations.conversations should be used) or if it
-// matches a provided item to review, else false.
-func (c *Conversations) reviewOK(idx int) bool {
-	if len(c.itemsToReview) == 0 {
-		return true
+// KeepItems sets the list of conversations to keep by idx. Normally
+// this will be run followed directly by Compact, but other calls to
+// Keep or ReviewItems may be used.
+func (c *Conversations) KeepItems(ki []int) error {
+	c.itemsToKeep = map[int]bool{}
+	for _, k := range ki {
+		if k < 0 {
+			return fmt.Errorf("item %d < 0", k)
+		}
+		if k > (len(c.conversations) - 1) {
+			return fmt.Errorf("item %d > conversation length", len(c.conversations))
+		}
+		c.itemsToKeep[k] = true
 	}
-	if _, ok := c.itemsToReview[idx]; ok {
-		return true
-	}
-	return false
+	return nil
 }
 
-// Iter returns the natural sequence of conversation
+// Iter returns the sequence of conversation, altered by itemsToReview
+// and itemsToKeep if supplied. itemsToKeep used alone simply sets the
+// items wanted for compaction without yielding any results.
+//
+// Either the full sequence of conversation or the itemsToKeep sequence
+// of conversation used in conjunction with itemsToReview will only
+// yield the itemsToReview.
+//
+// Iter is normally applied to a reversed conversation so that older
+// material can be removed with reference to the latest information,
+// rather than the other way around, at the user's preference.
 func (c *Conversations) Iter() iter.Seq[conversation] {
+
+	reviewOK := func(idx int) bool {
+		if _, ok := c.itemsToReview[idx]; ok {
+			return true
+		}
+		return false
+	}
+	keepOK := func(idx int) bool {
+		if _, ok := c.itemsToKeep[idx]; ok {
+			return true
+		}
+		return false
+	}
 	return func(yield func(conversation) bool) {
 		for _, conv := range c.conversations {
-			if !c.reviewOK(conv.Idx) {
-				_ = c.Keep(conv.Idx)
+
+			switch {
+			// Return all items if itemsToKeep and itemsToReview are
+			// empty.
+			case len(c.itemsToKeep) == 0 && len(c.itemsToReview) == 0:
+				// show all
+
+			// Automatically keep all items other than the items to
+			// review if itemsToReview is not empty and itemsToKeep is
+			// empty.
+			case len(c.itemsToKeep) == 0 && len(c.itemsToReview) > 0:
+				if !reviewOK(conv.Idx) {
+					_ = c.Keep(conv.Idx)
+					continue
+				}
+				// show only items to review
+
+			// Keep all items in itemsToKeep, don't show any
+			case len(c.itemsToKeep) > 0 && len(c.itemsToReview) == 0:
+				if keepOK(conv.Idx) {
+					_ = c.Keep(conv.Idx)
+					continue
+				}
 				continue
+				// don't show any
+
+			case len(c.itemsToKeep) > 0 && len(c.itemsToReview) > 0:
+				if !reviewOK(conv.Idx) && !keepOK(conv.Idx) {
+					continue
+				}
+				if !reviewOK(conv.Idx) && keepOK(conv.Idx) {
+					_ = c.Keep(conv.Idx)
+					continue
+				}
+				// show only review items
+
 			}
 			if !yield(conv) {
 				return
@@ -113,7 +175,7 @@ func (c *Conversations) Iter() iter.Seq[conversation] {
 	}
 }
 
-// Get gets a conversation by idx
+// Get gets a conversation from the conversations sequence by idx.
 func (c *Conversations) Get(idx int) conversation {
 	if idx > len(c.conversations)-1 || idx < 0 {
 		panic(fmt.Sprintf("conversation len %d, invalid index %d", len(c.conversations), idx))
@@ -124,6 +186,7 @@ func (c *Conversations) Get(idx int) conversation {
 	return c.conversations[len(c.conversations)-1-idx]
 }
 
+// Keep stores an item for keeping on compaction.
 func (c *Conversations) Keep(idx int) error {
 	if c.compactRun {
 		return errors.New("compaction already run")
