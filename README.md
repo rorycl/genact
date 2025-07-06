@@ -1,6 +1,6 @@
 # genact
 
-Version v0.0.2
+Version v0.0.3
 
 A golang module and command line programs to interact with Google's
 Gemini large context window LLMs.
@@ -23,7 +23,7 @@ Interact with a Google Gemini large context window LLM API over the cli.
 
 ```
 Usage:
-  genact version v0.0.2
+  genact version v0.0.3
 
 Have a conversation with gemini AI with the provided prompt file using
 the settings file (by default at settings.yaml) and, optionally, either
@@ -83,7 +83,7 @@ cost.
 
 ```
 Usage:
-  thinner version v0.0.2
+  thinner version v0.0.3
 
 Interactively "thin" a gemini history file saved with genact by choosing
 which conversations from the history to output to a new history json file.
