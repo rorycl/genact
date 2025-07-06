@@ -8,12 +8,10 @@ import (
 	"strings"
 
 	flags "github.com/jessevdk/go-flags"
+	"github.com/rorycl/genact"
 )
 
-const (
-	Version    string = "0.0.1" // program version
-	historyDir string = "conversations"
-)
+const historyDir string = "conversations"
 
 var usage string = fmt.Sprintf(`[-a apiHistory] [-s studioHistory] -c "chat name" [-d directory] [-y yaml] prompt.txt
 
@@ -50,7 +48,7 @@ Will create something like the following output:
 The 20250630T204842-history.json file can be used for the next call to
 the api to "continue" the conversation.
 
-`, Version)
+`, genact.Version)
 
 // CmdOptions are flag options which consume os.Args input.
 type CmdOptions struct {

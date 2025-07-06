@@ -6,10 +6,7 @@ import (
 	"os"
 
 	flags "github.com/jessevdk/go-flags"
-)
-
-const (
-	Version string = "0.0.2" // program version
+	"github.com/rorycl/genact"
 )
 
 var usage string = fmt.Sprintf(`[-o outputFile] [-r 1, -r 3...] historyFile.json
@@ -33,7 +30,7 @@ means the last item.
 Usint the -k/--keep flag presets the items to keep. This may be used in
 combination with the -r/--review items which may be different or
 overlapping sets, where at most the -k + -r conversations will be kept.
-`, Version)
+`, genact.Version)
 
 // CmdOptions are flag options which consume os.Args input.
 type CmdOptions struct {
