@@ -9,9 +9,7 @@ import (
 	"github.com/rorycl/genact"
 )
 
-var usage string = fmt.Sprintf(`[-o outputFile] [-r 1, -r 3...] historyFile.json
-
-version %s
+var usage string = fmt.Sprintf(`version %s
 
 Interactively "thin" a gemini history file saved with genact by choosing
 which conversations from the history to output to a new history json file.
@@ -29,8 +27,10 @@ means the last item.
 
 Usint the -k/--keep flag presets the items to keep. This may be used in
 combination with the -r/--review items which may be different or
-overlapping sets, where at most the -k + -r conversations will be kept.
-`, genact.Version)
+overlapping sets, where at most the -k + -r conversations will be kept
+after interactive review.
+
+./thinner [-o outputFile] [-r 1, -r 3...] [-k 0, -k 2...] `, genact.Version)
 
 // CmdOptions are flag options which consume os.Args input.
 type CmdOptions struct {

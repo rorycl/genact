@@ -1,5 +1,7 @@
 # genact
 
+Version v0.0.2
+
 A golang module and command line programs to interact with Google's
 Gemini large context window LLMs.
 
@@ -8,21 +10,20 @@ The two cli programmes provided are:
 * `genact`\
   interact with the gemini api, optionally providing history from a
   saved ai studio or api history file, saving history to a structured
-  json file.
+  json file together with the prompt and output as noted below.
 
 * `thinner`\
   an inventively-named program for thinning a history file to omit
-  user/model conversation pairs.
+  user/model conversation pairs to reduce token size and processing
+  cost.
 
-## cli
+## genact
 
-See `cmd/cli/`: a cli to interact with genesis models.
+Interact with a Google Gemini large context window LLM API over the cli.
 
 ```
 Usage:
-  genact [-a apiHistory] [-s studioHistory] -c "chat name" [-d directory] [-y yaml] prompt.txt
-
-version 0.0.1
+  genact version v0.0.2
 
 Have a conversation with gemini AI with the provided prompt file using
 the settings file (by default at settings.yaml) and, optionally, either
@@ -40,7 +41,7 @@ response to the current working directory for easy reference.
 As a result, a call to this program for the first time along the
 following lines:
 
-	./genact -c hi prompt.txt
+	./genai -c hi prompt.txt
 
 Will create something like the following output:
 
@@ -54,6 +55,9 @@ Will create something like the following output:
 
 The 20250630T204842-history.json file can be used for the next call to
 the api to "continue" the conversation.
+
+./genact [-a apiHistory] [-s studioHistory] -c "chat name" \
+         [-d directory] [-y yaml] Prompt
 
 Application Options:
   -a, --apiHistory=    path to api history json file
@@ -70,13 +74,16 @@ Arguments:
 
 ```
 
-`cmd/thinner`: thin a history file
+## thinner
+
+`thinner` thins a history file saved from previous interactions using
+`genact` to remove unneeded items to reduce token size and therefore
+cost.
+
 
 ```
 Usage:
-  thinner [-o outputFile] [-r 1, -r 3...] historyFile.json
-
-version 0.0.1
+  thinner version v0.0.2
 
 Interactively "thin" a gemini history file saved with genact by choosing
 which conversations from the history to output to a new history json file.
@@ -91,11 +98,18 @@ Using the -r/--review flag only reviews the (0-indexed) conversations
 numbered, the other indexed items are kept. Negative indexing can be
 used to refer to items from the end of the list of conversations, so -1
 means the last item.
- InputFile
+
+Usint the -k/--keep flag presets the items to keep. This may be used in
+combination with the -r/--review items which may be different or
+overlapping sets, where at most the -k + -r conversations will be kept
+after interactive review.
+
+./thinner [-o outputFile] [-r 1, -r 3...] [-k 0, -k 2...] InputFile
 
 Application Options:
   -o, --outputFile= file path to save output
   -r, --review=     list of specific conversation pairs to review
+  -k, --keep=       list of specific conversation pairs to keep
 
 Help Options:
   -h, --help        Show this help message

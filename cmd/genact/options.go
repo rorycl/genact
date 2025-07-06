@@ -13,9 +13,7 @@ import (
 
 const historyDir string = "conversations"
 
-var usage string = fmt.Sprintf(`[-a apiHistory] [-s studioHistory] -c "chat name" [-d directory] [-y yaml] prompt.txt
-
-version %s
+var usage string = fmt.Sprintf(`version %s
 
 Have a conversation with gemini AI with the provided prompt file using
 the settings file (by default at settings.yaml) and, optionally, either
@@ -48,7 +46,8 @@ Will create something like the following output:
 The 20250630T204842-history.json file can be used for the next call to
 the api to "continue" the conversation.
 
-`, genact.Version)
+./genact [-a apiHistory] [-s studioHistory] -c "chat name" \
+         [-d directory] [-y yaml] `, genact.Version)
 
 // CmdOptions are flag options which consume os.Args input.
 type CmdOptions struct {
