@@ -28,6 +28,12 @@ func runCommand(s string) {
 
 func main() {
 
+	var (
+		originalConversationLen  int
+		compactedConversationLen int
+	)
+
+	// Parse the command line options.
 	options, err := ParseOptions()
 	if err != nil {
 		var pe ParserError
@@ -37,55 +43,84 @@ func main() {
 		os.Exit(1)
 	}
 
-	// find "glow"
+	// Find the "glow" binary.
 	glowPath, err = exec.LookPath("glow")
 	if err != nil {
-		fmt.Printf("glow could not be found: %v", err)
+		fmt.Printf("glow could not be found: %v'n", err)
 		os.Exit(1)
 	}
 
-	// load conversation
+	// Load the conversation from history.
 	conversations, err := genact.NewConversations(options.inputFile)
 	if err != nil {
-		fmt.Printf("could not load history file: %v", err)
+		fmt.Printf("could not load history file: %v\n", err)
+		os.Exit(1)
+	}
+	originalConversationLen = conversations.Len()
+	if originalConversationLen == 0 {
+		fmt.Println("no conversations found")
+		os.Exit(0)
+	}
+
+	// Reverse the file.
+	conversations.Reverse()
+
+	// Initialise review items, if any.
+	err = conversations.ReviewItems(options.Review)
+	if err != nil {
+		fmt.Printf("review items failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	// reverse the file
-	conversations.Reverse()
-
-	// initialise review items, if any
-	err = conversations.ReviewItems(options.Review)
+	// Initialise keep items, if any.
+	err = conversations.KeepItems(options.Keep)
 	if err != nil {
-		fmt.Printf("review items failed: %v", err)
+		fmt.Printf("keep items failed: %v\n", err)
+		os.Exit(1)
 	}
 
-	// iterate over conversations
+	// Iterate over conversations.
 	for c := range conversations.Iter() {
 		content := fmt.Sprint(c) // convert to string representation
 		runCommand(content)
 		if question() {
 			err := conversations.Keep(c.Idx)
 			if err != nil {
-				fmt.Printf("conversation index %d could not be found: %v", c.Idx, err)
+				fmt.Printf("conversation index %d could not be kept: %v\n", c.Idx, err)
 			}
 		}
 	}
 
-	// compact the conversations
+	// Compact the conversations to remove unwanted items.
 	conversations.Compact()
+	compactedConversationLen = conversations.Len()
+	if compactedConversationLen == 0 {
+		fmt.Println("No conversations left after compaction")
+		os.Exit(0)
+	}
+	if compactedConversationLen == originalConversationLen {
+		fmt.Println("Compacted and original conversation length are the same. Aborting.")
+		os.Exit(0)
+	}
 
-	// serialize output to json
+	// Serialize the compacted conversation to json.
 	output, err := conversations.Serialize()
 	if err != nil {
 		fmt.Printf("serialization error: %v\n", err)
 		os.Exit(1)
 	}
 
-	// write to file
+	// Write the serialized information to file.
 	_, err = options.output.Write(output)
 	if err != nil {
 		fmt.Println(err)
 	}
 	_ = options.output.Close()
+
+	// Inform the user.
+	fmt.Printf(
+		"Original conversations of %d items successfully compacted to %d items.\n",
+		originalConversationLen,
+		compactedConversationLen,
+	)
 }

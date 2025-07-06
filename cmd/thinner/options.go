@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	Version string = "0.0.1" // program version
+	Version string = "0.0.2" // program version
 )
 
 var usage string = fmt.Sprintf(`[-o outputFile] [-r 1, -r 3...] historyFile.json
@@ -29,12 +29,17 @@ Using the -r/--review flag only reviews the (0-indexed) conversations
 numbered, the other indexed items are kept. Negative indexing can be
 used to refer to items from the end of the list of conversations, so -1
 means the last item.
+
+Usint the -k/--keep flag presets the items to keep. This may be used in
+combination with the -r/--review items which may be different or
+overlapping sets, where at most the -k + -r conversations will be kept.
 `, Version)
 
 // CmdOptions are flag options which consume os.Args input.
 type CmdOptions struct {
 	OutputFile string `short:"o" long:"outputFile" required:"true" description:"file path to save output"`
 	Review     []int  `short:"r" long:"review" description:"list of specific conversation pairs to review"`
+	Keep       []int  `short:"k" long:"keep" description:"list of specific conversation pairs to keep"`
 	output     *os.File
 	inputFile  string
 	Args       struct {

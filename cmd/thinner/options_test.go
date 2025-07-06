@@ -29,30 +29,49 @@ func TestOptions(t *testing.T) {
 		desc   string
 		args   []string
 		review []int
+		keep   []int
 		isErr  bool
 	}{
 		{
 			desc:   "missing output",
 			args:   []string{"prog", "../../testdata/api-history-tennis.json"},
 			review: nil,
+			keep:   nil,
 			isErr:  true,
 		},
 		{
 			desc:   "missing input",
 			args:   []string{"prog", "-o", outputFileName, testFileName},
 			review: nil,
+			keep:   nil,
 			isErr:  true,
 		},
 		{
 			desc:   "ok",
 			args:   []string{"prog", "-o", outputFileName, "../../testdata/api-history-tennis.json"},
 			review: nil,
+			keep:   nil,
 			isErr:  false,
 		},
 		{
 			desc:   "ok with review",
 			args:   []string{"prog", "-o", outputFileName, "-r", "3", "-r", "4", "../../testdata/api-history-tennis.json"},
 			review: []int{3, 4},
+			keep:   nil,
+			isErr:  false,
+		},
+		{
+			desc:   "ok with keep",
+			args:   []string{"prog", "-o", outputFileName, "-k", "0", "-k", "1", "../../testdata/api-history-tennis.json"},
+			review: nil,
+			keep:   []int{0, 1},
+			isErr:  false,
+		},
+		{
+			desc:   "ok with review and keep",
+			args:   []string{"prog", "-o", outputFileName, "-r", "3", "-r", "4", "-k", "0", "-k", "1", "../../testdata/api-history-tennis.json"},
+			review: []int{3, 4},
+			keep:   []int{0, 1},
 			isErr:  false,
 		},
 	}
@@ -73,6 +92,9 @@ func TestOptions(t *testing.T) {
 			}
 			if diff := cmp.Diff(po.Review, tt.review); diff != "" {
 				t.Errorf("review mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(po.Keep, tt.keep); diff != "" {
+				t.Errorf("keep mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
