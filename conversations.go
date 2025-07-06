@@ -24,7 +24,7 @@ func (co conversation) String() string {
 	output := "\n`user`:\n\n"
 	output += co.User
 	output += "\n\n---\n\n`agent`:\n\n"
-	output += strings.Join(co.Model, "\n\n--\n\n")
+	output += strings.Join(co.Model, "\n\n---\n\n")
 	return output
 }
 
@@ -67,46 +67,50 @@ func (c *Conversations) Len() int {
 // ReviewItems sets the list of conversations to review by idx. Items
 // with a negative index are replaced with the relevant item from the
 // end of the slice of conversation. ReviewItems are only relevant to
-// the Iter main review iterator.
+// the `Iter` main review iterator which sets a keep index, used for
+// compacting the conversations using the `Compact` method.
 func (c *Conversations) ReviewItems(ri []int) error {
-	c.itemsToReview = map[int]bool{}
-	for _, idx := range ri {
+	var err error
+	c.itemsToReview, err = c.makeMapOfItems(ri)
+	return err
+}
+
+// KeepItems sets the list of conversations to keep by idx,
+// short-circuiting the main review process provided by `Iter`. Notes
+// otherwise are as for ReviewItems.
+func (c *Conversations) KeepItems(ki []int) error {
+	var err error
+	c.itemsToKeep, err = c.makeMapOfItems(ki)
+	return err
+}
+
+// makeMapOfItems makes a map of valid conversation items.
+func (c *Conversations) makeMapOfItems(is []int) (map[int]bool, error) {
+	thisMap := map[int]bool{}
+	for _, idx := range is {
 		if idx < 0 {
 			i := len(c.conversations) + idx
 			if i < 0 {
-				return fmt.Errorf("item %d out of range len %d", idx, len(c.conversations))
+				return nil, fmt.Errorf("item %d out of range len %d", idx, len(c.conversations))
 			}
-			c.itemsToReview[i] = true
+			thisMap[i] = true
 			continue
 		}
 		if idx > len(c.conversations)-1 {
-			return fmt.Errorf("item %d out of range len %d", idx, len(c.conversations))
+			return nil, fmt.Errorf("item %d out of range len %d", idx, len(c.conversations))
 		}
-		c.itemsToReview[idx] = true
+		thisMap[idx] = true
 	}
-	return nil
+	return thisMap, nil
 }
 
-// KeepItems sets the list of conversations to keep by idx. Normally
-// this will be run followed directly by Compact, but other calls to
-// Keep or ReviewItems may be used.
-func (c *Conversations) KeepItems(ki []int) error {
-	c.itemsToKeep = map[int]bool{}
-	for _, k := range ki {
-		if k < 0 {
-			return fmt.Errorf("item %d < 0", k)
-		}
-		if k > (len(c.conversations) - 1) {
-			return fmt.Errorf("item %d > conversation length", len(c.conversations))
-		}
-		c.itemsToKeep[k] = true
-	}
-	return nil
-}
+// Iter returns the sequence of conversation, altered by the
+// itemsToReview and itemsToKeep maps if set, to allow the user to
+// review each conversation in turn to decide if it is to be included
+// (using `Keep`) or discarded from the resulting history file.
 
-// Iter returns the sequence of conversation, altered by itemsToReview
-// and itemsToKeep if supplied. itemsToKeep used alone simply sets the
-// items wanted for compaction without yielding any results.
+// itemsToKeep used alone simply sets the items wanted for compaction
+// without yielding any conversations to the user.
 //
 // Either the full sequence of conversation or the itemsToKeep sequence
 // of conversation used in conjunction with itemsToReview will only
@@ -133,30 +137,33 @@ func (c *Conversations) Iter() iter.Seq[conversation] {
 		for _, conv := range c.conversations {
 
 			switch {
-			// Return all items if itemsToKeep and itemsToReview are
+			// Return each item if itemsToKeep and itemsToReview are
 			// empty.
 			case len(c.itemsToKeep) == 0 && len(c.itemsToReview) == 0:
-				// show all
+				// Show everything.
 
-			// Automatically keep all items other than the items to
-			// review if itemsToReview is not empty and itemsToKeep is
-			// empty.
+			// If there are no items to keep and some to review, keep
+			// everything in conversations but only show those to
+			// review.
 			case len(c.itemsToKeep) == 0 && len(c.itemsToReview) > 0:
 				if !reviewOK(conv.Idx) {
 					_ = c.Keep(conv.Idx)
 					continue
 				}
-				// show only items to review
+				// Show only items to review.
 
-			// Keep all items in itemsToKeep, don't show any
+			// If there are items to keep and none to review, keep the
+			// former but don't show any.
 			case len(c.itemsToKeep) > 0 && len(c.itemsToReview) == 0:
 				if keepOK(conv.Idx) {
 					_ = c.Keep(conv.Idx)
 					continue
 				}
 				continue
-				// don't show any
+				// Don't show any items.
 
+			// If there are both items to keep and items to review, keep
+			// those in the former but always show those to review.
 			case len(c.itemsToKeep) > 0 && len(c.itemsToReview) > 0:
 				if !reviewOK(conv.Idx) && !keepOK(conv.Idx) {
 					continue
@@ -165,9 +172,10 @@ func (c *Conversations) Iter() iter.Seq[conversation] {
 					_ = c.Keep(conv.Idx)
 					continue
 				}
-				// show only review items
+				// Show only review items.
 
 			}
+			// Show the conversation.
 			if !yield(conv) {
 				return
 			}
@@ -226,7 +234,7 @@ func (c *Conversations) Compact() {
 	c.compactRun = true
 }
 
-// Serialize serializes a conversations to json after conversion to a
+// Serialize serializes conversations to json after conversion to a
 // slice of APIJsonContent.
 func (c *Conversations) Serialize() ([]byte, error) {
 	ajc := []APIJsonContent{}
