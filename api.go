@@ -3,8 +3,7 @@
 // module provides a simple mechanism for sending prompts and recorded
 // history (if applicable) and receiving a response and the new history,
 // suitable for iterative interactions with Genesis Pro 2.5 taking
-// advantage of the large Genesis token window.
-// window
+// advantage of large Genesis token windows.
 package genact
 
 import (
@@ -30,7 +29,7 @@ type ApiResponse struct {
 var logger *log.Logger
 
 // initalise logging
-func NewLogger(enabled bool) {
+func newLogger(enabled bool) {
 	writer := io.Discard
 	if enabled {
 		writer = os.Stdout
@@ -123,7 +122,7 @@ func APIGetResponse(settings map[string]string, history []*genai.Content, prompt
 		return nil, errors.New("settings not provided")
 	}
 	logging := !(settings["logging"] == "false")
-	NewLogger(logging)
+	newLogger(logging)
 
 	ctx := context.Background()
 	client, chat, err := startChat(ctx, settings)

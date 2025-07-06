@@ -28,18 +28,18 @@ func (co conversation) String() string {
 	return output
 }
 
-// Conversations is a collection of user/agent(model) conversation
+// Conversations is a collection of user/agent (or model) conversation
 // interactions recorded in time order.
 //
-// Conversations are the components of a history file, normally the user
-// conversing with the agent in user/model pairs. Sometimes there might
-// be more than one agent response, when one of the agent pairs is a
-// "thinking" record.
+// Conversations are the components of a genact history file, normally
+// the user conversing with the agent in user/model pairs. Sometimes
+// there might be more than one agent response, when agent's responses
+// includes a "thinking" record.
 //
 // Conversations are a slice of Conversation arranging these
 // conversation turns into a sequence to allow for `thinning` to exclude
-// one ore more instance of a conversation from the sequence of
-// conversations.
+// one or more instances of a conversation from the sequence of
+// conversations to reduce token size and processing cost.
 //
 // The resulting Conversations slice can be serialized to a json
 // "history" file for providing back to the genesis api for further
@@ -104,21 +104,22 @@ func (c *Conversations) makeMapOfItems(is []int) (map[int]bool, error) {
 	return thisMap, nil
 }
 
-// Iter returns the sequence of conversation, altered by the
+// Iter iterates over the sequence of conversation, altered by the
 // itemsToReview and itemsToKeep maps if set, to allow the user to
 // review each conversation in turn to decide if it is to be included
 // (using `Keep`) or discarded from the resulting history file.
 
-// itemsToKeep used alone simply sets the items wanted for compaction
-// without yielding any conversations to the user.
+// KeepItems simply sets the items wanted for compaction without
+// yielding any conversations to the user.
 //
-// Either the full sequence of conversation or the itemsToKeep sequence
-// of conversation used in conjunction with itemsToReview will only
-// yield the itemsToReview.
+// Either the full sequence of conversation or the KeepItems of
+// conversation used in conjunction with ReviewItems will only yield the
+// ReviewItems.
 //
-// Iter is normally applied to a reversed conversation so that older
-// material can be removed with reference to the latest information,
-// rather than the other way around, at the user's preference.
+// Iter is normally applied to a reversed conversation (using Reverse)
+// so that older material can be removed with reference to the latest
+// information, rather than the other way around, at the user's
+// preference.
 func (c *Conversations) Iter() iter.Seq[conversation] {
 
 	reviewOK := func(idx int) bool {
@@ -183,7 +184,7 @@ func (c *Conversations) Iter() iter.Seq[conversation] {
 	}
 }
 
-// Get gets a conversation from the conversations sequence by idx.
+// Get gets a conversation from the conversations slice.
 func (c *Conversations) Get(idx int) conversation {
 	if idx > len(c.conversations)-1 || idx < 0 {
 		panic(fmt.Sprintf("conversation len %d, invalid index %d", len(c.conversations), idx))
@@ -194,7 +195,7 @@ func (c *Conversations) Get(idx int) conversation {
 	return c.conversations[len(c.conversations)-1-idx]
 }
 
-// Keep stores an item for keeping on compaction.
+// Keep stores a conversation turn for keeping on compaction.
 func (c *Conversations) Keep(idx int) error {
 	if c.compactRun {
 		return errors.New("compaction already run")
@@ -215,8 +216,9 @@ func (c *Conversations) Keep(idx int) error {
 	return nil
 }
 
-// Compact rewrites the conversations to only those that are in the keep
-// index slice.
+// Compact rewrites the conversations to only include those conversation
+// turns selected by the user by using Keep (potentially after
+// interactive review) or KeepItems.
 func (c *Conversations) Compact() {
 	if c.compactRun {
 		panic("compaction already run")

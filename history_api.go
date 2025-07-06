@@ -9,13 +9,15 @@ import (
 	"github.com/google/generative-ai-go/genai"
 )
 
-// history file json structure
+// APIJsonContent represents each conversation "turn" in an API history
+// file.
 type APIJsonContent struct {
 	Role  string   `json:"Role"`
 	Parts []string `json:"Parts,omitempty"`
 }
 
-// ReadAPIHistory reads json history from an AI API history file.
+// ReadAPIHistory reads json history from an API history file, returning
+// a slice of APIJsonContent.
 func ReadAPIHistory(filePath string) ([]APIJsonContent, error) {
 	var previousHistory []APIJsonContent
 	historyBytes, err := os.ReadFile(filePath)
@@ -52,8 +54,8 @@ func apiToAIContent(jc []APIJsonContent) ([]*genai.Content, error) {
 	return contents, nil
 }
 
-// HistoryAPIToAIContent parses an AI API history file from Google
-// Gemini into a slice of *genai.Content, or error.
+// HistoryAPIToAIContent parses an API history file from Google Gemini
+// into a slice of *genai.Content, or error.
 func HistoryAPIToAIContent(filePath string) ([]*genai.Content, error) {
 	aiAPIExport, err := ReadAPIHistory(filePath)
 	if err != nil {

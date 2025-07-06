@@ -9,7 +9,8 @@ import (
 	"github.com/google/generative-ai-go/genai"
 )
 
-// AIStudioChunk represents a single turn in the conversation from the export file.
+// AIStudioChunk represents a single turn in the conversation from a
+// Google AI Studio export file.
 type AIStudioChunk struct {
 	Text       string `json:"text"`
 	Role       string `json:"role"`
@@ -19,7 +20,7 @@ type AIStudioChunk struct {
 }
 
 // AIStudioExport represents the top-level structure of the JSON file
-// exported from Google AI Studio.
+// exported from Google AI Studio containing a slice of AIStudioChunk.
 type AIStudioExport struct {
 	ChunkedPrompt struct {
 		Chunks []AIStudioChunk `json:"chunks"`
@@ -65,7 +66,7 @@ func aiStudioToAIContent(studioChunks []AIStudioChunk) ([]*genai.Content, error)
 	return contents, nil
 }
 
-// HistoryStudioToAIContent parses an AI history file saved from Google
+// HistoryStudioToAIContent parses a history file saved from Google
 // Gemini AI Studio into a slice of *genai.Content, or error.
 func HistoryStudioToAIContent(filePath string) ([]*genai.Content, error) {
 	aiStudioExport, err := readStudioHistory(filePath)
