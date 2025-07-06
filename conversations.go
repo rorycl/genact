@@ -237,11 +237,11 @@ func (c *Conversations) Compact() {
 }
 
 // Serialize serializes conversations to json after conversion to a
-// slice of APIJsonContent.
+// slice of APIConversation.
 func (c *Conversations) Serialize() ([]byte, error) {
-	ajc := []APIJsonContent{}
+	ajc := []APIConversation{}
 	addContent := func(role string, parts []string) {
-		ajc = append(ajc, APIJsonContent{role, parts})
+		ajc = append(ajc, APIConversation{role, parts})
 	}
 	for _, conv := range c.conversations {
 		addContent("user", []string{conv.User})
