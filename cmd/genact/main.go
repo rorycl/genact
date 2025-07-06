@@ -1,5 +1,6 @@
-// cli is a programme for working interactively with the Genesis 2.5 api
-// to make the most of the large token window provided by Genesis.
+// genact is a programme (using the genact golang module) for working
+// interactively with the Genesis 2.5 api to make the most of the large
+// token window provided by Genesis.
 package main
 
 import (

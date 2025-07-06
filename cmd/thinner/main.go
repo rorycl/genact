@@ -1,3 +1,5 @@
+// thinner is a programme (using the genact golang module) for
+// "thinning" genesis pro LLM model interaction histories.
 package main
 
 import (
