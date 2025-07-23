@@ -4,3 +4,6 @@ cmd/cli/genact
 cmd/thinner/thinner
 bin/*
 cover*
+
+# interactive test environment
+genesis
