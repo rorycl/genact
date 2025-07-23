@@ -21,7 +21,8 @@ type conversation struct {
 // String is a string representation of a conversation, suitable for
 // piping to a markdown reader such as "glow".
 func (co conversation) String() string {
-	output := "\n`user`:\n\n"
+	output := fmt.Sprintf("\n`conversation`: %d\n", co.Idx)
+	output += "\n`user`:\n\n"
 	output += co.User
 	output += "\n\n---\n\n`agent`:\n\n"
 	output += strings.Join(co.Model, "\n\n---\n\n")
