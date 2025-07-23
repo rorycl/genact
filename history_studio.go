@@ -33,13 +33,13 @@ func readStudioHistory(filePath string) (*AIStudioExport, error) {
 	var studioExport AIStudioExport
 	historyBytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read studio history file: %v", err)
+		return nil, fmt.Errorf("failed to read studio history file: %v", err)
 	}
 	if err := json.Unmarshal(historyBytes, &studioExport); err != nil {
-		return nil, fmt.Errorf("Failed to parse studio history file: %v", err)
+		return nil, fmt.Errorf("failed to parse studio history file: %v", err)
 	}
 	if len(studioExport.ChunkedPrompt.Chunks) == 0 {
-		return nil, fmt.Errorf("No history found in %s", filePath)
+		return nil, fmt.Errorf("no history found in %s", filePath)
 	}
 	return &studioExport, nil
 }
@@ -52,7 +52,7 @@ func aiStudioToAIContent(studioChunks []AIStudioChunk) ([]*genai.Content, error)
 		if thisContent.Text == "" {
 			continue
 		}
-		if thisContent.IsThought { // we aren't loading thoughts
+		if thisContent.IsThought { // don't load thoughts
 			continue
 		}
 		c := genai.Content{}
@@ -61,7 +61,7 @@ func aiStudioToAIContent(studioChunks []AIStudioChunk) ([]*genai.Content, error)
 		contents = append(contents, &c)
 	}
 	if len(contents) == 0 {
-		return nil, errors.New("the provided studio history file is effectively empty.")
+		return nil, errors.New("the provided studio history file is effectively empty")
 	}
 	return contents, nil
 }

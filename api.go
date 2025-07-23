@@ -50,7 +50,7 @@ func startChat(ctx context.Context, settings map[string]string) (*genai.Client, 
 
 // endChat closes a client session.
 func endChat(client *genai.Client) {
-	client.Close()
+	_ = client.Close()
 }
 
 // runAPI runs the api given a *genai.ChatSession, history (if any) and
@@ -62,15 +62,15 @@ func runAPI(ctx context.Context, chat *genai.ChatSession, history []*genai.Conte
 	logger.Println("Sending prompt to Gemini API...")
 	resp, err := chat.SendMessage(ctx, genai.Text(prompt))
 	if err != nil {
-		return nil, fmt.Errorf("Failed to send message: %v", err)
+		return nil, fmt.Errorf("failed to send message: %v", err)
 	}
 	if resp.PromptFeedback != nil && resp.PromptFeedback.BlockReason > 0 {
-		return nil, fmt.Errorf("Received BlockReason: %d", resp.PromptFeedback.BlockReason)
+		return nil, fmt.Errorf("received BlockReason: %d", resp.PromptFeedback.BlockReason)
 	}
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, errors.New("Received an empty response from the API.")
+		return nil, errors.New("received an empty response from the API")
 	}
-	logger.Println("Response ok")
+	logger.Println("response ok")
 
 	return resp, nil
 }
@@ -107,7 +107,7 @@ func parseResponse(chat *genai.ChatSession, resp *genai.GenerateContentResponse)
 	FullHistory := chat.History
 	historyJSON, err := json.MarshalIndent(FullHistory, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to marshal new history: %v", err)
+		return nil, fmt.Errorf("failed to marshal new history: %v", err)
 	}
 	thisResponse.FullHistory = string(historyJSON)
 	return &thisResponse, nil
@@ -121,7 +121,7 @@ func APIGetResponse(settings map[string]string, history []*genai.Content, prompt
 	if settings == nil {
 		return nil, errors.New("settings not provided")
 	}
-	logging := !(settings["logging"] == "false")
+	logging := settings["logging"] != "false"
 	newLogger(logging)
 
 	ctx := context.Background()

@@ -22,10 +22,10 @@ func ReadAPIHistory(filePath string) ([]APIConversation, error) {
 	var previousHistory []APIConversation
 	historyBytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read api history file: %v", err)
+		return nil, fmt.Errorf("failed to read api history file: %v", err)
 	}
 	if err := json.Unmarshal(historyBytes, &previousHistory); err != nil {
-		return nil, fmt.Errorf("Failed to parse ai history file: %v", err)
+		return nil, fmt.Errorf("failed to parse ai history file: %v", err)
 	}
 	return previousHistory, nil
 }
@@ -49,7 +49,7 @@ func apiToAIContent(jc []APIConversation) ([]*genai.Content, error) {
 		contents = append(contents, &c)
 	}
 	if len(contents) == 0 {
-		return nil, errors.New("the provided api history file is effectively empty.")
+		return nil, errors.New("the provided api history file is effectively empty")
 	}
 	return contents, nil
 }
