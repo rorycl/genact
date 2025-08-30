@@ -18,7 +18,8 @@ var usage string = fmt.Sprintf(`version %s
 Have a conversation with gemini AI with the provided prompt file using
 the settings file (by default at settings.yaml) and, optionally, either
 a history file saved from previous AI discussions or downloaded from
-Google AI studio.
+Google AI studio. By default the last-generated history file will be
+used, if it exists.
 
 Within "Directory" (by default the current working directory) a
 "conversations" directory will be made if it does not exist. For each
@@ -44,7 +45,8 @@ Will create something like the following output:
 	└── output.md
 
 The 20250630T204842-history.json file can be used for the next call to
-the api to "continue" the conversation.
+the api to "continue" the conversation, which is what will happen by
+default if no apiHistory or studioHistory is specified.
 
 ./genact [-a apiHistory] [-s studioHistory] -c "chat name" \
          [-d directory] [-y yaml] `, genact.Version)

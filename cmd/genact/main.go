@@ -40,12 +40,26 @@ func main() {
 
 	// load history if required
 	history := []*genai.Content{}
-	if options.APIHistory != "" {
+
+	switch {
+	// If no history is specified, try and load the latest for this
+	// chat.
+	case options.withoutHistory:
+		historyFile := LatestHistoryFile(options.chatDirPath)
+		if historyFile == "" {
+			break
+		}
+		log.Printf("Using history file %s for chat", historyFile)
+		history, err = genact.HistoryAPIToAIContent(historyFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+	case options.APIHistory != "":
 		history, err = genact.HistoryAPIToAIContent(options.APIHistory)
 		if err != nil {
 			log.Fatal(err)
 		}
-	} else if options.StudioHistory != "" {
+	case options.StudioHistory != "":
 		history, err = genact.HistoryStudioToAIContent(options.StudioHistory)
 		if err != nil {
 			log.Fatal(err)
