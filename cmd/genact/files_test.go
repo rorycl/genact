@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -65,5 +66,21 @@ func TestFiles(t *testing.T) {
 			err = fmt.Errorf("file %s could not be found", f)
 			t.Error(err)
 		}
+	}
+}
+
+// TestLatestHistoryFile tests to check if the latest history file is
+// extracted from a directory.
+func TestLatestHistoryFile(t *testing.T) {
+	path := "../../testdata/limerick"
+	f := LatestHistoryFile(path)
+	if got, want := f, filepath.Join(path, "20250830T190913_history.json"); got != want {
+		t.Errorf("got %s want %s", got, want)
+	}
+
+	path = "/dev/null"
+	f = LatestHistoryFile(path)
+	if f != "" {
+		t.Fatal("expected file reading from /dev/null to be an empty string")
 	}
 }

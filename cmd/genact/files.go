@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 )
 
@@ -12,6 +13,7 @@ const (
 	outputFileBaseName  = "output.md"
 	historyFileBaseName = "history.json"
 	conversationDir     = "conversations"
+	timeFormat          = "20060102T150405"
 )
 
 // files are the file and directory paths for the programme output.
@@ -62,8 +64,47 @@ func (f *files) WriteHistory(b []byte) error {
 	return f.makeDirs()
 }
 
+// LatestHistoryFile finds the latest history file, if any. This is a
+// package function. This returns an empty string if no history file is
+// found. An example history file name is `20250829T220640_history.json`
+// and the creation time is extracted from the filename.
+func LatestHistoryFile(path string) string {
+	type cf struct {
+		creation time.Time
+		name     string
+	}
+	historyFiles := []cf{}
+	getCF := func(s string) {
+		t, err := time.Parse(timeFormat+"_history.json", s)
+		if err != nil {
+			return
+		}
+		historyFiles = append(historyFiles, cf{t, s})
+	}
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return "" // path may not have been made yet
+	}
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		getCF(f.Name())
+	}
+	if len(historyFiles) < 1 {
+		return ""
+	}
+	slices.SortFunc(historyFiles, func(a, b cf) int {
+		if a.creation.After(b.creation) {
+			return -1
+		}
+		return 1
+	})
+	return filepath.Join(path, historyFiles[0].name)
+}
+
 func NewFiles(workingDir, chat string) (*files, error) {
-	ts := time.Now().Format("20060102T150405")
+	ts := time.Now().Format(timeFormat)
 	joinTS := func(s string) string {
 		return fmt.Sprintf("%s_%s", ts, s)
 	}
