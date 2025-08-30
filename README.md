@@ -1,6 +1,6 @@
 # genact
 
-Version v0.0.3
+Version v0.0.4
 
 A golang module and command line programs to interact with Google's
 Gemini large context window LLMs.
@@ -11,6 +11,7 @@ The two cli programmes provided are:
   interact with the gemini api, optionally providing history from a
   saved ai studio or api history file, saving history to a structured
   json file together with the prompt and output as noted below.
+  The last history file for a chat is used by default.
 
 * `thinner`\
   an inventively-named program for thinning a history file to omit
@@ -19,16 +20,33 @@ The two cli programmes provided are:
 
 ## genact
 
-Interact with a Google Gemini large context window LLM API over the cli.
+Interact with a Google Gemini large context window LLM API using the
+cli.
+
+Simply put, start or continue a chat on the subject of `limericks` as
+follows:
+
+```bash
+genact -c limericks prompt.txt
+```
+
+A timestamped history file will be made by default in
+`conversations/limericks` which will be re-used for the next
+conversation. Timestamped prompt and output `.md` files will be
+similarly saved. Output can be conveniently viewed with markdown readers
+such as CharmBracelet's [glow](https://github.com/charmbracelet/glow).
+
+The `genact --help` output is as follows:
 
 ```
 Usage:
-  genact version v0.0.3
+  genact version v0.0.4
 
 Have a conversation with gemini AI with the provided prompt file using
-the settings file (by default at settings.yaml) and, optionally, either
-a history file saved from previous AI discussions or downloaded from
-Google AI studio.
+the settings file (by default settings.yaml) and, optionally, either a
+history file saved from previous AI discussions or downloaded from
+Google AI studio. By default the last-generated history file will be
+used, if it exists.
 
 Within "Directory" (by default the current working directory) a
 "conversations" directory will be made if it does not exist. For each
@@ -54,10 +72,11 @@ Will create something like the following output:
 	└── output.md
 
 The 20250630T204842-history.json file can be used for the next call to
-the api to "continue" the conversation.
+the api to "continue" the conversation, which is what will happen by
+default if no apiHistory or studioHistory is specified.
 
 ./genact [-a apiHistory] [-s studioHistory] -c "chat name" \
-         [-d directory] [-y yaml] Prompt
+         [-d directory] [-y yaml]  Prompt
 
 Application Options:
   -a, --apiHistory=    path to api history json file
@@ -71,54 +90,9 @@ Help Options:
 
 Arguments:
   Prompt:              prompt text file
-
-```
-
-## thinner
-
-`thinner` thins a history file saved from previous interactions using
-`genact` to remove unneeded items to reduce token size and therefore
-cost.
-
-
-```
-Usage:
-  thinner version v0.0.3
-
-Interactively "thin" a gemini history file saved with genact by choosing
-which conversations from the history to output to a new history json file.
-
-Note that the conversations are replayed in reverse order, but
-recompiled in the original order.
-
-This uses bubbletea's "glow" markdown pager programme, which needs to be
-on your PATH.
-
-Using the -r/--review flag only reviews the (0-indexed) conversations
-numbered, the other indexed items are kept. Negative indexing can be
-used to refer to items from the end of the list of conversations, so -1
-means the last item.
-
-Usint the -k/--keep flag presets the items to keep. This may be used in
-combination with the -r/--review items which may be different or
-overlapping sets, where at most the -k + -r conversations will be kept
-after interactive review.
-
-./thinner [-o outputFile] [-r 1, -r 3...] [-k 0, -k 2...] InputFile
-
-Application Options:
-  -o, --outputFile= file path to save output
-  -r, --review=     list of specific conversation pairs to review
-  -k, --keep=       list of specific conversation pairs to keep
-
-Help Options:
-  -h, --help        Show this help message
-
-Arguments:
-  InputFile:        input history json file
-
 ```
 
 ## Licence
 
 This project is licensed under the [MIT Licence](LICENCE).
+
