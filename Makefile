@@ -66,7 +66,7 @@ lint:
 
 module-update-tidy:
 	go get -u ./...
-	go mod tidy ./...
+	go mod tidy
 
 build:
 	go build -o bin/genact ./cmd/genact/
