@@ -1,138 +1,140 @@
-// Package genact provides a way for interacting with the Google Genesis
-// AI API for text only prompts using the text chat interface. This
-// module provides a simple mechanism for sending prompts and recorded
-// history (if applicable) and receiving a response and the new history,
-// suitable for iterative interactions with Genesis Pro 2.5 taking
-// advantage of large Genesis token windows.
-package genact
+package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log"
-	"os"
 	"strings"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
-type ApiResponse struct {
-	TokenCount     int32
-	LatestResponse string
-	FullHistory    string
-}
+// GenerateResponse calls the API.
+func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFile, newTurn Turn) (*Turn, int, error) {
 
-var logger *log.Logger
-
-// initalise logging
-func newLogger(enabled bool) {
-	writer := io.Discard
-	if enabled {
-		writer = os.Stdout
-	}
-	logger = log.New(writer, "", log.LstdFlags)
-}
-
-// startChat starts a client/model/chat.
-func startChat(ctx context.Context, settings map[string]string) (*genai.Client, *genai.ChatSession, error) {
-	client, err := genai.NewClient(ctx, option.WithAPIKey(settings["apiKey"]))
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:  settings.APIKey,
+		Backend: genai.BackendGeminiAPI, // Use standard Gemini API backend
+	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create client: %v", err)
-	}
-	model := client.GenerativeModel(settings["modelName"])
-	chat := model.StartChat()
-	return client, chat, nil
-}
-
-// endChat closes a client session.
-func endChat(client *genai.Client) {
-	_ = client.Close()
-}
-
-// runAPI runs the api given a *genai.ChatSession, history (if any) and
-// a prompt string.
-func runAPI(ctx context.Context, chat *genai.ChatSession, history []*genai.Content, prompt string) (*genai.GenerateContentResponse, error) {
-
-	chat.History = history
-
-	logger.Println("Sending prompt to Gemini API...")
-	resp, err := chat.SendMessage(ctx, genai.Text(prompt))
-	if err != nil {
-		return nil, fmt.Errorf("failed to send message: %v", err)
-	}
-	if resp.PromptFeedback != nil && resp.PromptFeedback.BlockReason > 0 {
-		return nil, fmt.Errorf("received BlockReason: %d", resp.PromptFeedback.BlockReason)
-	}
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, errors.New("received an empty response from the API")
-	}
-	logger.Println("response ok")
-
-	return resp, nil
-}
-
-// parseResponse takes a *genai.ChatSession and a
-// *genai.GenerateContentResponse to parse a responseinto a local
-// ApiResponse struct for easier handling. Presently only the first
-// Candidate is considered (resp.Candidates[0]).
-//
-// Todo: deal with "isThinking"/"Thinking" responses from the AI API,
-// which may not be useful to put into history.
-func parseResponse(chat *genai.ChatSession, resp *genai.GenerateContentResponse) (*ApiResponse, error) {
-
-	thisResponse := ApiResponse{
-		TokenCount: resp.UsageMetadata.PromptTokenCount,
+		return nil, 0, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// expecting only 1 candidate in this code
-	if len(resp.Candidates) != 1 {
-		return nil, fmt.Errorf("expected only 1 candidate, got %d", len(resp.Candidates))
-	}
+	// 1. Construct Content history
+	var contents []*genai.Content
 
-	var LatestResponse strings.Builder
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if txt, ok := part.(genai.Text); ok {
-			LatestResponse.WriteString(string(txt))
+	// Add previous history
+	if history != nil {
+		for _, turn := range history.Turns {
+			c := &genai.Content{
+				Role:  turn.Role,
+				Parts: make([]*genai.Part, 0),
+			}
+
+			// Add Text
+			for _, text := range turn.TextParts {
+				c.Parts = append(c.Parts, &genai.Part{Text: text})
+			}
+
+			// Add Attachments
+			for _, att := range turn.Attachments {
+				c.Parts = append(c.Parts, &genai.Part{
+					InlineData: &genai.Blob{
+						MIMEType: att.MIMEType,
+						Data:     att.Data,
+					},
+				})
+			}
+
+			// Add Thought Signature (if present and model role)
+			if turn.Role == "model" && len(turn.ThoughtSignature) > 0 {
+				c.Parts = append(c.Parts, &genai.Part{
+					ThoughtSignature: turn.ThoughtSignature,
+				})
+			}
+
+			contents = append(contents, c)
 		}
 	}
-	thisResponse.LatestResponse = LatestResponse.String()
-	if thisResponse.LatestResponse == "" {
-		return nil, errors.New("latest response had no text content")
+
+	// 2. Add Current User Turn
+	userContent := &genai.Content{
+		Role:  "user",
+		Parts: make([]*genai.Part, 0),
+	}
+	for _, text := range newTurn.TextParts {
+		userContent.Parts = append(userContent.Parts, &genai.Part{Text: text})
+	}
+	for _, att := range newTurn.Attachments {
+		userContent.Parts = append(userContent.Parts, &genai.Part{
+			InlineData: &genai.Blob{
+				MIMEType: att.MIMEType,
+				Data:     att.Data,
+			},
+		})
+	}
+	contents = append(contents, userContent)
+
+	// 3. Configure Thinking
+	var thinkingConfig *genai.ThinkingConfig
+	// Check if model supports thinking (simple heuristic or explicit settings)
+	// Assuming Gemini 3.0 or 2.0-flash-thinking supports it.
+	if strings.Contains(settings.ModelName, "thinking") || strings.Contains(settings.ModelName, "gemini-3") {
+		level := genai.ThinkingLevelHigh
+		if settings.ThinkingLevel == "low" {
+			level = genai.ThinkingLevelLow
+		}
+		thinkingConfig = &genai.ThinkingConfig{
+			IncludeThoughts: true,
+			ThinkingLevel:   level,
+		}
 	}
 
-	FullHistory := chat.History
-	historyJSON, err := json.MarshalIndent(FullHistory, "", "  ")
+	// 4. Call API
+	if settings.Logging {
+		log.Printf("Sending request to %s with %d history turns...", settings.ModelName, len(contents))
+	}
+
+	resp, err := client.Models.GenerateContent(ctx, settings.ModelName, contents, &genai.GenerateContentConfig{
+		ThinkingConfig: thinkingConfig,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal new history: %v", err)
+		return nil, 0, fmt.Errorf("api error: %w", err)
 	}
-	thisResponse.FullHistory = string(historyJSON)
-	return &thisResponse, nil
-}
 
-// APIGetResponse creates a genai client and chat session, runs the api
-// to receive a response, and then puts the response into a local
-// ApiResponse struct for convenient processing.
-func APIGetResponse(settings map[string]string, history []*genai.Content, prompt string) (*ApiResponse, error) {
+	// 5. Parse Response
+	if len(resp.Candidates) == 0 {
+		return nil, 0, fmt.Errorf("no candidates returned")
+	}
 
-	if settings == nil {
-		return nil, errors.New("settings not provided")
+	cand := resp.Candidates[0]
+	modelTurn := &Turn{
+		Role:      "model",
+		Timestamp: resp.CreateTime,
 	}
-	logging := settings["logging"] != "false"
-	newLogger(logging)
 
-	ctx := context.Background()
-	client, chat, err := startChat(ctx, settings)
-	defer endChat(client)
-	if err != nil {
-		return nil, fmt.Errorf("could not start chat: %w", err)
+	// Extract content
+	for _, part := range cand.Content.Parts {
+		if part.Text != "" {
+			if part.Thought {
+				modelTurn.Thought += part.Text + "\n"
+			} else {
+				modelTurn.TextParts = append(modelTurn.TextParts, part.Text)
+			}
+		}
+		if len(part.ThoughtSignature) > 0 {
+			modelTurn.ThoughtSignature = part.ThoughtSignature
+		}
 	}
-	response, err := runAPI(ctx, chat, history, prompt)
-	if err != nil {
-		return nil, fmt.Errorf("chat response error: %w", err)
+
+	// Clean up whitespace
+	modelTurn.Thought = strings.TrimSpace(modelTurn.Thought)
+
+	// Tokens
+	tokenCount := 0
+	if resp.UsageMetadata != nil {
+		tokenCount = int(resp.UsageMetadata.TotalTokenCount)
 	}
-	return parseResponse(chat, response)
+
+	return modelTurn, tokenCount, nil
 }
