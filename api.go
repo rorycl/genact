@@ -23,6 +23,9 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
 	// 1. Construct Content history
 	var contents []*genai.Content
 
+	// Count the conversation turns.
+	var turns int = 0
+
 	// Add previous history
 	if history != nil {
 		for _, turn := range history.Turns {
@@ -51,6 +54,11 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
 				c.Parts = append(c.Parts, &genai.Part{
 					ThoughtSignature: turn.ThoughtSignature,
 				})
+			}
+
+			// Count only User turns.
+			if turn.Role == "user" {
+				turns++
 			}
 
 			contents = append(contents, c)
@@ -92,7 +100,7 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
 
 	// 4. Call API
 	if settings.Logging {
-		log.Printf("Sending request to %s with %d history turns...", settings.ModelName, len(contents))
+		log.Printf("Sending request to %s with %d history turns...", settings.ModelName, turns)
 	}
 
 	resp, err := client.Models.GenerateContent(ctx, settings.ModelName, contents, &genai.GenerateContentConfig{
