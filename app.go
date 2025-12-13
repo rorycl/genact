@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"genact/internal/filechk"
 )
 
 // App represents the main gathering point of the application, bringing
@@ -20,20 +23,60 @@ func NewApp() *App {
 	return &App{}
 }
 
-// Converse runs a conversation turn with the Gemini API.
-func (a *App) Converse(ctx context.Context, conversationName,
-	promptPath, settingsPath, historyPath, thinkingLevel string, isNew,
-	isHistoric bool, attachments []string) error {
+// ConversationOptions are the options to pass to Converse.
+type ConverseOptions struct {
+	ConversationName string
+	PromptPath       string
+	SettingsPath     string
+	HistoryPath      string
+	ThinkingLevel    string
+	IsNew            bool
+	IsLegacyHistory  bool
+	Attachments      []string
+}
 
-	settings, err := LoadYaml(settingsPath)
+// Validate validates the options.
+func (c ConverseOptions) Validate() error {
+
+	if c.PromptPath == "" {
+		return errors.New("prompt file not specified")
+	}
+	if filechk.IsFile(c.PromptPath) {
+		return fmt.Errorf("prompt file %q not found", c.PromptPath)
+	}
+
+	if c.ConversationName == "" {
+		return errors.New("conversation name `-c` cannot be empty")
+	}
+
+	if filechk.IfNotEmptyAndIsFile(c.HistoryPath) {
+		return fmt.Errorf("history file %q not found", c.HistoryPath)
+	}
+
+	for _, a := range c.Attachments {
+		if filechk.IsFile(a) == false {
+			return fmt.Errorf("attachment %q not found", a)
+		}
+	}
+	return nil
+}
+
+// Converse runs a conversation turn with the Gemini API.
+func (a *App) Converse(ctx context.Context, cfg ConverseOptions) error {
+
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+
+	settings, err := LoadYaml(cfg.SettingsPath)
 	if err != nil {
 		return err
 	}
 
-	// Override thinkingLevel in settings based on flags.
-	settings.ThinkingLevel = thinkingLevel
+	// Override thinkingLevel in settings based on config.
+	settings.ThinkingLevel = cfg.ThinkingLevel
 
-	paths, err := NewFilePaths("", conversationName, false)
+	paths, err := NewFilePaths("", cfg.ConversationName, cfg.IsNew, false)
 	if err != nil {
 		return err
 	}
@@ -43,28 +86,32 @@ func (a *App) Converse(ctx context.Context, conversationName,
 	// The history is defaulted to a "new", history-less HistoryPath.
 	var forkReason string
 	var parentID string
-	history := &HistoryFile{
-		ID:            "",
-		ParentID:      "",
-		ForkReason:    "new",
-		OriginalModel: settings.ModelName,
-		Turns:         []Turn{},
+	var history *HistoryFile
+
+	initHistory := func() *HistoryFile {
+		return &HistoryFile{
+			ID:            "",
+			ParentID:      "",
+			ForkReason:    "new",
+			OriginalModel: settings.ModelName,
+			Turns:         []Turn{},
+		}
 	}
 
 	switch {
-	case isNew: // new
-		break
+	case cfg.IsNew:
+		history = initHistory()
 
-	case historyPath != "" && isHistoric:
-		history, err = MigrateLegacy(historyPath)
+	case cfg.HistoryPath != "" && cfg.IsLegacyHistory:
+		history, err = MigrateLegacy(cfg.HistoryPath)
 		if err != nil {
 			return err
 		}
 		forkReason = "legacy_fork"
 		parentID = history.ID
 
-	case historyPath != "":
-		history, err = LoadHistory(historyPath)
+	case cfg.HistoryPath != "":
+		history, err = LoadHistory(cfg.HistoryPath)
 		if err != nil {
 			return err
 		}
@@ -76,8 +123,8 @@ func (a *App) Converse(ctx context.Context, conversationName,
 		if err != nil {
 			return err
 		}
-		if latest == "" { // new
-			break
+		if latest == "" {
+			history = initHistory()
 		}
 		history, err = LoadHistory(latest)
 		if err != nil {
@@ -91,7 +138,7 @@ func (a *App) Converse(ctx context.Context, conversationName,
 	sessionID := paths.Timestamp
 
 	// Prepare User Turn
-	promptBytes, err := os.ReadFile(promptPath)
+	promptBytes, err := os.ReadFile(cfg.PromptPath)
 	if err != nil {
 		return err
 	}
@@ -102,7 +149,7 @@ func (a *App) Converse(ctx context.Context, conversationName,
 	}
 
 	// Load attachments
-	for _, ap := range attachments {
+	for _, ap := range cfg.Attachments {
 		att, err := LoadAttachment(ap)
 		if err != nil {
 			return err
@@ -131,7 +178,7 @@ func (a *App) Converse(ctx context.Context, conversationName,
 		return err
 	}
 
-	// 8. Write Outputs
+	// Write Outputs
 	fullOutput := strings.Join(modelTurn.TextParts, "\n\n")
 	if modelTurn.Thought != "" {
 		// consider using an anonymous struct for this to look cleaner.
@@ -139,7 +186,8 @@ func (a *App) Converse(ctx context.Context, conversationName,
 	}
 
 	os.WriteFile(paths.ResponseFile, []byte(fullOutput), 0644)
-	os.WriteFile(paths.PromptFile, promptBytes, 0644) // Save snapshot of prompt
+	os.WriteFile(paths.LocalResponseFile, []byte(fullOutput), 0644) // save snapshot of output
+	os.WriteFile(paths.PromptFile, promptBytes, 0644)               // save snapshot of prompt
 
 	log.Printf("Done. Saved to %s\n", paths.HistoryFile)
 
@@ -187,7 +235,7 @@ func (a *App) ParseFiles(ctx context.Context, settingsPath, promptPath string, a
 	}
 
 	// Setup "files" directory structure
-	paths, err := NewFilePaths("", "parsed", true) // "parsed" is a generic bucket name in files/
+	paths, err := NewFilePaths("", "parsed", true, true) // "parsed" is a generic bucket name in files/
 	if err != nil {
 		return err
 	}
@@ -234,7 +282,7 @@ func (a *App) ParseFiles(ctx context.Context, settingsPath, promptPath string, a
 
 // Lineage reports on the lineage of a conversation.
 func (a *App) Lineage(conversation string) error {
-	paths, err := NewFilePaths("", conversation, false)
+	paths, err := NewFilePaths("", conversation, false, false)
 	if err != nil {
 		return err
 	}

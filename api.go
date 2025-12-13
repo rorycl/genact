@@ -20,13 +20,13 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
 		return nil, 0, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// 1. Construct Content history
+	// Initialise the content history.
 	var contents []*genai.Content
 
 	// Count the conversation turns.
 	var turns int = 0
 
-	// Add previous history
+	// Add any previous history
 	if history != nil {
 		for _, turn := range history.Turns {
 			c := &genai.Content{
@@ -83,10 +83,10 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
 	}
 	contents = append(contents, userContent)
 
-	// 3. Configure Thinking
-	var thinkingConfig *genai.ThinkingConfig
+	// Configure Thinking
 	// Check if model supports thinking (simple heuristic or explicit settings)
 	// Assuming Gemini 3.0 or 2.0-flash-thinking supports it.
+	var thinkingConfig *genai.ThinkingConfig
 	if strings.Contains(settings.ModelName, "thinking") || strings.Contains(settings.ModelName, "gemini-3") {
 		level := genai.ThinkingLevelHigh
 		if settings.ThinkingLevel == "low" {
@@ -98,7 +98,7 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
 		}
 	}
 
-	// 4. Call API
+	// Call the API.
 	if settings.Logging {
 		log.Printf("Sending request to %s with %d history turns...", settings.ModelName, turns)
 	}
@@ -110,7 +110,7 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
 		return nil, 0, fmt.Errorf("api error: %w", err)
 	}
 
-	// 5. Parse Response
+	// Parse the API response.
 	if len(resp.Candidates) == 0 {
 		return nil, 0, fmt.Errorf("no candidates returned")
 	}

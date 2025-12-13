@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"mime"
 	"os"
 	"path/filepath"
@@ -53,18 +55,19 @@ func LoadAttachment(path string) (Attachment, error) {
 
 // FilePaths manages the directory structure.
 type FilePaths struct {
-	BaseDir         string
-	ChatDir         string
-	Timestamp       string
-	PromptFile      string
-	ResponseFile    string
-	HistoryFile     string
-	HistoryLinkFile string // symlink to latest
+	BaseDir           string
+	ChatDir           string
+	Timestamp         string
+	PromptFile        string
+	ResponseFile      string
+	LocalResponseFile string
+	HistoryFile       string
+	HistoryLinkFile   string // symlink to latest
 }
 
-func NewFilePaths(baseDir, chatName string, isParseFile bool) (*FilePaths, error) {
+func NewFilePaths(baseDir, chatName string, isNewChat, isParseFile bool) (*FilePaths, error) {
 	ts := time.Now().Format(timeFormat)
-	
+
 	rootDir := conversationDir
 	if isParseFile {
 		rootDir = filesDir
@@ -81,20 +84,36 @@ func NewFilePaths(baseDir, chatName string, isParseFile bool) (*FilePaths, error
 
 	// Sanitize chat name
 	chatName = strings.ReplaceAll(strings.ToLower(strings.TrimSpace(chatName)), " ", "_")
-	
+
 	// /conversations/<chat>/
 	fullChatDir := filepath.Join(baseDir, rootDir, chatName)
+
+	// Check the status of the target directory. For new conversations,
+	// the directory should not exist. For continuing conversations
+	// (without the isNewChat flag), the directory should exist.
+	stat, err := os.Stat(fullChatDir)
+	var pe fs.PathError
+	switch {
+	case isNewChat && !errors.As(err, &pe):
+		return nil, fmt.Errorf("directory %q already exists", fullChatDir)
+	case !isNewChat && errors.Is(err, &pe):
+		return nil, fmt.Errorf("chat %q not initialised; used 'new'", chatName)
+	case !isNewChat && !stat.IsDir():
+		return nil, fmt.Errorf("%q is not a directory", fullChatDir)
+	}
+
 	if err := os.MkdirAll(fullChatDir, 0755); err != nil {
 		return nil, err
 	}
 
 	return &FilePaths{
-		BaseDir:      baseDir,
-		ChatDir:      fullChatDir,
-		Timestamp:    ts,
-		PromptFile:   filepath.Join(fullChatDir, fmt.Sprintf("%s_%s", ts, promptFileBaseName)),
-		ResponseFile: filepath.Join(fullChatDir, fmt.Sprintf("%s_%s", ts, outputFileBaseName)),
-		HistoryFile:  filepath.Join(fullChatDir, fmt.Sprintf("%s_%s", ts, historyFileBaseName)),
+		BaseDir:           baseDir,
+		ChatDir:           fullChatDir,
+		Timestamp:         ts,
+		PromptFile:        filepath.Join(fullChatDir, fmt.Sprintf("%s_%s", ts, promptFileBaseName)),
+		ResponseFile:      filepath.Join(fullChatDir, fmt.Sprintf("%s_%s", ts, outputFileBaseName)),
+		LocalResponseFile: filepath.Join(baseDir, "output.md"),
+		HistoryFile:       filepath.Join(fullChatDir, fmt.Sprintf("%s_%s", ts, historyFileBaseName)),
 	}, nil
 }
 

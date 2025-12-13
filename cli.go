@@ -2,15 +2,12 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"os"
 
 	"github.com/urfave/cli/v3"
 )
 
 const (
-	ShortUsage      = "A cli program for interacting with Genesis LLMs"
+	ShortUsage      = "A cli program for interacting with Gemini 3 series LLMs"
 	LongDescription = `The genact program uses a local settings and
    prompt file to 'converse' with the LLM. Additional facilities are
    provided for one-shot file parsing, history regeneration and history
@@ -20,7 +17,7 @@ const (
 // Applicator is an interface to the central coordinator for the project
 // (concretely provided by App in app.go) to allow for testing.
 type Applicator interface {
-	Converse(ctx context.Context, conversationName, promptPath, settingsPath, historyPath, thinkingLevel string, isNew, isHistoric bool, attachments []string) error
+	Converse(ctx context.Context, cfg ConverseOptions) error
 	Regenerate(inputPath string) error
 	ParseFiles(ctx context.Context, settingsPath, promptPath string, attachments []string) error
 	Lineage(conversation string) error
@@ -32,31 +29,10 @@ type Applicator interface {
 // This is work in progress.
 func BuildCLI(app Applicator) *cli.Command {
 
-	// isFile determines if a file exists.
-	isFile := func(path string) bool {
-		o, err := os.Stat(path)
-		if err != nil {
-			return false
-		}
-		if o.IsDir() == true {
-			return false
-		}
-		return true
-	}
-
-	// Return true if a path is empty ("") or if it is not empty, check
-	// if the file exists.
-	isNotEmptyAndIsFile := func(path string) bool {
-		if path == "" {
-			return false
-		}
-		return isFile(path)
-	}
-
 	// Converse
 	converseCmd := &cli.Command{
 		Name:  "converse",
-		Usage: "Converse with gemini",
+		Usage: "Converse with gemini 3.0 LLMs",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "conversation",
@@ -67,7 +43,7 @@ func BuildCLI(app Applicator) *cli.Command {
 			&cli.BoolFlag{
 				Name:    "new",
 				Aliases: []string{"n"},
-				Usage:   "Ensure the conversation is new",
+				Usage:   "Make a new conversation",
 			},
 			&cli.StringFlag{
 				Name:    "history",
@@ -90,62 +66,26 @@ func BuildCLI(app Applicator) *cli.Command {
 				Usage:   "Override settings thinking level (low|high)",
 			},
 			&cli.StringFlag{
-				Name:     "settings",
-				Aliases:  []string{"y"},
-				Value:    "settings.yaml",
-				Required: true,
-				Usage:    "Path to settings file (required)"},
+				Name:    "settings",
+				Aliases: []string{"y"},
+				Value:   "settings.yaml",
+				Usage:   "Path to settings file (required)"},
 		},
 		ArgsUsage: "`PROMPT_FILE`",
 
-		// Before runs validations before "Action" is run.
-		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
-			if c.NArg() != 1 {
-				return ctx, fmt.Errorf("missing required argument: `PROMPT_FILE`")
-			}
-			promptFile := c.Args().First()
-			if isFile(promptFile) == false {
-				return ctx, fmt.Errorf("prompt file %q not found", promptFile)
-			}
-
-			conversation := c.String("conversation")
-			settings := c.String("settings")
-			// newFlag := c.Bool("new")
-			historyFile := c.String("history")
-			// isHistoricHistory := c.Bool("old-history")
-			attachments := c.StringSlice("attach")
-
-			if conversation == "" {
-				return ctx, errors.New("conversation name `-c` cannot be empty")
-			}
-
-			// File existence checks.
-			if isFile(settings) == false {
-				return ctx, fmt.Errorf("settings file %q not found", promptFile)
-			}
-			if isNotEmptyAndIsFile(historyFile) {
-				return ctx, fmt.Errorf("history file %q not found", promptFile)
-			}
-			for _, a := range attachments {
-				if isFile(a) == false {
-					return ctx, fmt.Errorf("attachment %q not found", a)
-				}
-			}
-			return ctx, nil
-		},
-
 		Action: func(ctx context.Context, c *cli.Command) error {
-
 			return app.Converse(
 				ctx,
-				c.String("conversation"),
-				c.Args().First(), // prompt file
-				c.String("settings"),
-				c.String("history"),
-				c.String("thinking"),
-				c.Bool("new"),
-				c.Bool("old-history"),
-				c.StringSlice("attach"),
+				ConverseOptions{
+					ConversationName: c.String("conversation"),
+					PromptPath:       c.Args().First(),
+					SettingsPath:     c.String("settings"),
+					HistoryPath:      c.String("history"),
+					ThinkingLevel:    c.String("thinking"),
+					IsNew:            c.Bool("new"),
+					IsLegacyHistory:  c.Bool("old-history"),
+					Attachments:      c.StringSlice("attach"),
+				},
 			)
 		},
 	}
