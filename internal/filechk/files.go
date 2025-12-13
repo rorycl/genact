@@ -14,11 +14,11 @@ func IsFile(path string) bool {
 	return true
 }
 
-// IfNotEmptyAndIsFile returns true if a path is empty ("") else if the
+// IfNotEmptyAndIsFile returns false if a path is empty ("") else if the
 // file exists.
 func IfNotEmptyAndIsFile(path string) bool {
 	if path == "" {
-		return true
+		return false
 	}
 	return IsFile(path)
 }

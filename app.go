@@ -41,7 +41,7 @@ func (c ConverseOptions) Validate() error {
 	if c.PromptPath == "" {
 		return errors.New("prompt file not specified")
 	}
-	if filechk.IsFile(c.PromptPath) {
+	if !filechk.IsFile(c.PromptPath) {
 		return fmt.Errorf("prompt file %q not found", c.PromptPath)
 	}
 
@@ -49,7 +49,7 @@ func (c ConverseOptions) Validate() error {
 		return errors.New("conversation name `-c` cannot be empty")
 	}
 
-	if filechk.IfNotEmptyAndIsFile(c.HistoryPath) {
+	if !filechk.IfNotEmptyAndIsFile(c.HistoryPath) {
 		return fmt.Errorf("history file %q not found", c.HistoryPath)
 	}
 
