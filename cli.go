@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"genact/app"
 
 	"github.com/urfave/cli/v3"
 )
@@ -17,7 +18,7 @@ const (
 // Applicator is an interface to the central coordinator for the project
 // (concretely provided by App in app.go) to allow for testing.
 type Applicator interface {
-	Converse(ctx context.Context, cfg ConverseOptions) error
+	Converse(ctx context.Context, cfg app.ConverseOptions) error
 	Regenerate(inputPath string) error
 	ParseFiles(ctx context.Context, settingsPath, promptPath string, attachments []string) error
 	Lineage(conversation string) error
@@ -27,7 +28,7 @@ type Applicator interface {
 // an Applicator dependency.
 //
 // This is work in progress.
-func BuildCLI(app Applicator) *cli.Command {
+func BuildCLI(a Applicator) *cli.Command {
 
 	// Converse
 	converseCmd := &cli.Command{
@@ -74,9 +75,9 @@ func BuildCLI(app Applicator) *cli.Command {
 		ArgsUsage: "`PROMPT_FILE`",
 
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return app.Converse(
+			return a.Converse(
 				ctx,
-				ConverseOptions{
+				app.ConverseOptions{
 					ConversationName: c.String("conversation"),
 					PromptPath:       c.Args().First(),
 					SettingsPath:     c.String("settings"),
@@ -99,7 +100,7 @@ func BuildCLI(app Applicator) *cli.Command {
 			&cli.StringFlag{Name: "apiHistory", Aliases: []string{"a"}, Required: true, Usage: "History file to strip"},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return app.Regenerate(
+			return a.Regenerate(
 				c.String("apiHistory"),
 			)
 		},
@@ -115,7 +116,7 @@ func BuildCLI(app Applicator) *cli.Command {
 		},
 		ArgsUsage: "[prompt_file]",
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return app.ParseFiles(
+			return a.ParseFiles(
 				ctx,
 				c.String("settings"),
 				c.Args().First(), // prompt file
@@ -132,7 +133,7 @@ func BuildCLI(app Applicator) *cli.Command {
 			&cli.StringFlag{Name: "conversation", Aliases: []string{"c"}, Required: true},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return app.Lineage(
+			return a.Lineage(
 				c.String("conversation"),
 			)
 		},

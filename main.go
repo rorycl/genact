@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+
+	"genact/app"
 )
 
 func main() {
 
-	app := NewApp()
-	cmd := BuildCLI(app)
+	a := app.NewApp()
+	cmd := BuildCLI(a)
 
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

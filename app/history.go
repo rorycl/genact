@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"encoding/json"
@@ -57,7 +57,7 @@ func MigrateLegacy(path string) (*HistoryFile, error) {
 func StripSignatures(h *HistoryFile) {
 	for i := range h.Turns {
 		h.Turns[i].ThoughtSignature = nil
-		// We keep the 'Thought' text string for human reference, 
+		// We keep the 'Thought' text string for human reference,
 		// but removing the signature forces the model to re-digest context.
 	}
 }

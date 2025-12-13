@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"encoding/json"
@@ -19,8 +19,8 @@ type Turn struct {
 	Attachments []Attachment `json:"attachments,omitempty"`
 
 	// Gemini 3.0 Specifics
-	Thought          string `json:"thought,omitempty"`           // The visible reasoning text
-	ThoughtSignature []byte `json:"thought_signature,omitempty"` // The opaque, encrypted state blob
+	Thought          string    `json:"thought,omitempty"`           // The visible reasoning text
+	ThoughtSignature []byte    `json:"thought_signature,omitempty"` // The opaque, encrypted state blob
 	Timestamp        time.Time `json:"timestamp"`
 }
 
