@@ -1,0 +1,47 @@
+This is helpful.
+
+Please refrain from the third person narrative (`Okay, so I'm looking at
+this `ConverseOptions` struct, and the user's concern about the CLI
+"depending" on the App layer...`). Please confirm this point and discuss
+matters directly with me, and also be fairly terse (if friendly) in your
+responses.
+
+Nevertheless the architecture explanation was helpful, and made sense.
+
+Given the project layout below (this is a dirty repo where I have
+been running the `genact` tool!), would you suggest moving
+{api,app,history,structs,settings}.go to an `app/` directory, to make
+this architecture more explicit?
+
+```
+./
+├── api.go
+├── app.go
+├── cli.go
+├── conversations
+│   └── genact3
+│       ├── 20251213T124657_history.json
+│       ├── 20251213T124657_output.md
+│       ├── 20251213T124657_prompt.txt
+│       ├── 20251213T143014_history.json
+│       ├── 20251213T143014_output.md
+│       └── 20251213T143014_prompt.txt
+├── files.go
+├── genact
+├── go.mod
+├── go.sum
+├── history.go
+├── internal
+│   └── filechk
+│       └── files.go
+├── LICENCE
+├── main.go
+├── Makefile
+├── prompt.txt
+├── README.md
+├── settings.go
+├── settings.yaml
+└── structs.go
+
+5 directories, 23 files
+```

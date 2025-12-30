@@ -1,0 +1,960 @@
+With your help, I'm porting my genesis 2.5 cli app to genesis 3 by the
+way my present modelName for this conversation is:
+
+```
+modelName  : "gemini-3-pro-preview"
+```
+
+I'd be grateful for your comments on my restructuring. First I've
+included the original main program, and then my proposed restructuring
+ahead of more cleaning up and adding some tests in the diff file.
+
+file:main.go
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"path/filepath"
+
+	"github.com/urfave/cli/v3"
+)
+
+func main() {
+	cmd := &cli.Command{
+		Name:    "genact",
+		Version: "v0.1.0-gemini3",
+		Usage:   "Interact with Google Gemini 3.0",
+		Commands: []*cli.Command{
+			// ---------------------------------------------------------
+			// CONVERSE
+			// ---------------------------------------------------------
+			{
+				Name:    "converse",
+				Aliases: []string{"c"},
+				Usage:   "Converse with the model (stateful)",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "conversation", Aliases: []string{"c"}, Usage: "Conversation name", Required: true},
+					&cli.BoolFlag{Name: "new", Aliases: []string{"n"}, Usage: "Force new conversation"},
+					&cli.StringFlag{Name: "history", Aliases: []string{"j", "jsonHistory"}, Usage: "Explicit path to a history file to fork from"},
+					&cli.BoolFlag{Name: "old-history", Aliases: []string{"o"}, Usage: "Import from legacy 0.0.4 format"},
+					&cli.StringSliceFlag{Name: "attach", Aliases: []string{"a"}, Usage: "Attach files (e.g. -a doc.pdf)"},
+					&cli.StringFlag{Name: "thinking", Aliases: []string{"t"}, Value: "high", Usage: "Thinking level (low|high)"},
+					&cli.StringFlag{Name: "settings", Aliases: []string{"y"}, Value: "settings.yaml", Usage: "Path to settings file"},
+				},
+				ArgsUsage: "[prompt_file]",
+				Action: func(ctx context.Context, c *cli.Command) error {
+					promptPath := c.Args().First()
+					if promptPath == "" {
+						return fmt.Errorf("prompt file argument is required")
+					}
+
+					// 1. Load Settings
+					settings, err := LoadYaml(c.String("settings"))
+					if err != nil {
+						return err
+					}
+					// Override settings with flags
+					settings.ThinkingLevel = c.String("thinking")
+
+					// 2. Setup Paths
+					chatName := c.String("conversation")
+					paths, err := NewFilePaths("", chatName, false)
+					if err != nil {
+						return err
+					}
+
+					// 3. Resolve History
+					var history *HistoryFile
+					var forkReason string
+					var parentID string
+
+					explicitHistory := c.String("history")
+					isLegacy := c.Bool("old-history")
+					forceNew := c.Bool("new")
+
+					if forceNew {
+						// Start fresh
+						forkReason = "new"
+					} else if explicitHistory != "" {
+						// Fork from specific file
+						if isLegacy {
+							history, err = MigrateLegacy(explicitHistory)
+							if err != nil {
+								return err
+							}
+							forkReason = "legacy_fork"
+						} else {
+							history, err = LoadHistory(explicitHistory)
+							if err != nil {
+								return err
+							}
+							forkReason = "branch"
+						}
+						// If forking, we define the PARENT as the ID of the loaded file
+						parentID = history.ID
+					} else {
+						// Auto-continue latest
+						latest, err := FindLatestHistory(paths.ChatDir)
+						if err != nil {
+							return err
+						}
+						if latest != "" {
+							history, err = LoadHistory(latest)
+							if err != nil {
+								return fmt.Errorf("failed to load previous history: %w", err)
+							}
+							parentID = history.ID
+							forkReason = "reply"
+						} else {
+							forkReason = "new"
+						}
+					}
+
+					// 4. Create New ID for this session
+					sessionID := paths.Timestamp
+
+					// If history exists, we technically prepare a 'new' history object based on it
+					// but we only populate the Previous Turns for the API call.
+					if history == nil {
+						history = &HistoryFile{
+							ID:            sessionID,
+							ParentID:      "",
+							ForkReason:    "new",
+							OriginalModel: settings.ModelName,
+							Turns:         []Turn{},
+						}
+					} else {
+						// Prepare for next step
+						// We don't modify 'history' in place yet, we pass it to API
+					}
+
+					// 5. Prepare User Turn
+					promptBytes, err := os.ReadFile(promptPath)
+					if err != nil {
+						return err
+					}
+
+					userTurn := Turn{
+						Role:      "user",
+						TextParts: []string{string(promptBytes)},
+						Timestamp: time.Now(),
+					}
+
+					// Load attachments
+					attachPaths := c.StringSlice("attach")
+					for _, ap := range attachPaths {
+						att, err := LoadAttachment(ap)
+						if err != nil {
+							return err
+						}
+						userTurn.Attachments = append(userTurn.Attachments, att)
+					}
+
+					// 6. API Call
+					fmt.Printf("Generating response using %s...\n", settings.ModelName)
+					modelTurn, tokenCount, err := GenerateResponse(ctx, settings, history, userTurn)
+					if err != nil {
+						return err
+					}
+
+					// 7. Update History & Save
+					// We create a NEW history file that contains:
+					// [Ancestors] + [UserTurn] + [ModelTurn]
+					newHistory := history.DeepCopy(sessionID, forkReason)
+					newHistory.ParentID = parentID
+					newHistory.OriginalModel = settings.ModelName
+					newHistory.TotalTokens = tokenCount
+					newHistory.Turns = append(newHistory.Turns, userTurn, *modelTurn)
+
+					historyBytes, _ := newHistory.Serialize()
+					if err := os.WriteFile(paths.HistoryFile, historyBytes, 0644); err != nil {
+						return err
+					}
+
+					// 8. Write Outputs
+					fullOutput := strings.Join(modelTurn.TextParts, "\n\n")
+					if modelTurn.Thought != "" {
+						fullOutput = fmt.Sprintf("<details><summary>Thinking</summary>\n\n%s\n\n</details>\n\n%s", modelTurn.Thought, fullOutput)
+					}
+
+					os.WriteFile(paths.ResponseFile, []byte(fullOutput), 0644)
+					os.WriteFile(paths.PromptFile, promptBytes, 0644) // Save snapshot of prompt
+
+					fmt.Printf("Done. Saved to %s\n", paths.HistoryFile)
+					return nil
+				},
+			},
+
+			// ---------------------------------------------------------
+			// REGEN / STRIP
+			// ---------------------------------------------------------
+			{
+				Name:    "regen",
+				Aliases: []string{"strip", "r"},
+				Usage:   "Regenerate a history file with no thought signatures",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "apiHistory", Aliases: []string{"a"}, Required: true, Usage: "History file to strip"},
+				},
+				Action: func(ctx context.Context, c *cli.Command) error {
+					inputPath := c.String("apiHistory")
+					history, err := LoadHistory(inputPath)
+					if err != nil {
+						return err
+					}
+
+					// Perform stripping
+					StripSignatures(history)
+
+					// Update Metadata
+					ts := time.Now().Format(timeFormat)
+					history.ParentID = history.ID
+					history.ID = ts
+					history.ForkReason = "strip_signatures"
+
+					// Save to same dir with new timestamp
+					dir := filepath.Dir(inputPath)
+					newPath := filepath.Join(dir, fmt.Sprintf("%s_history.json", ts))
+
+					bytes, _ := history.Serialize()
+					if err := os.WriteFile(newPath, bytes, 0644); err != nil {
+						return err
+					}
+
+					fmt.Printf("Stripped signatures. New file: %s\n", newPath)
+					return nil
+				},
+			},
+
+			// ---------------------------------------------------------
+			// PARSEFILE
+			// ---------------------------------------------------------
+			{
+				Name:    "parsefile",
+				Aliases: []string{"p"},
+				Usage:   "One-shot analysis of files (saved to files/ directory)",
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{Name: "file", Aliases: []string{"f"}, Required: true, Usage: "Files to attach"},
+					&cli.StringFlag{Name: "settings", Aliases: []string{"y"}, Value: "settings.yaml", Usage: "Path to settings file"},
+				},
+				ArgsUsage: "[prompt_file]",
+				Action: func(ctx context.Context, c *cli.Command) error {
+					promptPath := c.Args().First()
+					if promptPath == "" {
+						return fmt.Errorf("prompt file argument is required")
+					}
+
+					settings, err := LoadYaml(c.String("settings"))
+					if err != nil {
+						return err
+					}
+
+					// Setup "files" directory structure
+					paths, err := NewFilePaths("", "parsed", true) // "parsed" is a generic bucket name in files/
+					if err != nil {
+						return err
+					}
+
+					// Prepare User Turn (No History)
+					promptBytes, err := os.ReadFile(promptPath)
+					if err != nil {
+						return err
+					}
+
+					userTurn := Turn{
+						Role:      "user",
+						TextParts: []string{string(promptBytes)},
+						Timestamp: time.Now(),
+					}
+
+					for _, f := range c.StringSlice("file") {
+						att, err := LoadAttachment(f)
+						if err != nil {
+							return err
+						}
+						userTurn.Attachments = append(userTurn.Attachments, att)
+					}
+
+					fmt.Println("Parsing file(s)...")
+					// Pass nil history
+					modelTurn, _, err := GenerateResponse(ctx, settings, nil, userTurn)
+					if err != nil {
+						return err
+					}
+
+					// Write Output
+					fullOutput := strings.Join(modelTurn.TextParts, "\n\n")
+					if err := os.WriteFile(paths.ResponseFile, []byte(fullOutput), 0644); err != nil {
+						return err
+					}
+
+					// We DO NOT save history.json for parsefile, as requested,
+					// but we do save the response markdown.
+					fmt.Printf("Output saved to %s\n", paths.ResponseFile)
+					return nil
+				},
+			},
+
+			// ---------------------------------------------------------
+			// LINEAGE
+			// ---------------------------------------------------------
+			{
+				Name:    "lineage",
+				Aliases: []string{"l"},
+				Usage:   "View the lineage of a conversation",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "conversation", Aliases: []string{"c"}, Required: true},
+				},
+				Action: func(ctx context.Context, c *cli.Command) error {
+					chatName := c.String("conversation")
+					paths, err := NewFilePaths("", chatName, false)
+					if err != nil {
+						return err
+					}
+
+					files, err := ScanForLineage(paths.ChatDir)
+					if err != nil {
+						return err
+					}
+
+					if len(files) == 0 {
+						fmt.Println("No history found.")
+						return nil
+					}
+
+					// Simple output
+					fmt.Printf("Lineage for %s:\n", chatName)
+					fmt.Println("ID                  | Parent              | Reason             | Model          | Tokens")
+					fmt.Println("---------------------------------------------------------------------------------------")
+					for _, f := range files {
+						parent := f.ParentID
+						if len(parent) > 15 {
+							parent = "..." + parent[len(parent)-12:]
+						}
+						if parent == "" {
+							parent = "ROOT"
+						}
+
+						fmt.Printf("%-19s | %-19s | %-18s | %-14s | %d\n",
+							f.ID, parent, f.ForkReason, f.OriginalModel, f.TotalTokens)
+					}
+
+					return nil
+				},
+			},
+		},
+	}
+
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+```
+
+file:changes.diff
+```diff
+diff --git a/api.go b/api.go
+index 8d80edc..be38409 100644
+--- a/api.go
++++ b/api.go
+@@ -23,6 +23,9 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
+ 	// 1. Construct Content history
+ 	var contents []*genai.Content
+ 
++	// Count the conversation turns.
++	var turns int = 0
++
+ 	// Add previous history
+ 	if history != nil {
+ 		for _, turn := range history.Turns {
+@@ -53,6 +56,11 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
+ 				})
+ 			}
+ 
++			// Count only User turns.
++			if turn.Role == "user" {
++				turns++
++			}
++
+ 			contents = append(contents, c)
+ 		}
+ 	}
+@@ -92,7 +100,7 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
+ 
+ 	// 4. Call API
+ 	if settings.Logging {
+-		log.Printf("Sending request to %s with %d history turns...", settings.ModelName, len(contents))
++		log.Printf("Sending request to %s with %d history turns...", settings.ModelName, turns)
+ 	}
+ 
+ 	resp, err := client.Models.GenerateContent(ctx, settings.ModelName, contents, &genai.GenerateContentConfig{
+diff --git a/app.go b/app.go
+index 8edafc8..442d151 100644
+--- a/app.go
++++ b/app.go
+@@ -1,9 +1,11 @@
+ package main
+ 
+ import (
++	"context"
+ 	"fmt"
+ 	"log"
+ 	"os"
++	"path/filepath"
+ 	"strings"
+ 	"time"
+ )
+@@ -19,9 +21,11 @@ func NewApp() *App {
+ }
+ 
+ // Converse runs a conversation turn with the Gemini API.
+-func (a *App) Converse(conversationName, promptFile, settingsFile, historyFile, thinkingLevel string, isNew, isHistoric bool, attachments []string) error {
++func (a *App) Converse(ctx context.Context, conversationName,
++	promptPath, settingsPath, historyPath, thinkingLevel string, isNew,
++	isHistoric bool, attachments []string) error {
+ 
+-	settings, err := LoadYaml(settingsFile)
++	settings, err := LoadYaml(settingsPath)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -36,11 +40,11 @@ func (a *App) Converse(conversationName, promptFile, settingsFile, historyFile,
+ 
+ 	// Determine history file management. Note that if forking, we
+ 	// define the PARENT as the ID of the loaded file.
+-	// The history is defaulted to a "new", history-less HistoryFile.
++	// The history is defaulted to a "new", history-less HistoryPath.
+ 	var forkReason string
+ 	var parentID string
+ 	history := &HistoryFile{
+-		ID:            sessionID,
++		ID:            "",
+ 		ParentID:      "",
+ 		ForkReason:    "new",
+ 		OriginalModel: settings.ModelName,
+@@ -51,16 +55,16 @@ func (a *App) Converse(conversationName, promptFile, settingsFile, historyFile,
+ 	case isNew: // new
+ 		break
+ 
+-	case historyFile != "" && isHistoric:
+-		history, err = MigrateLegacy(historyFile)
++	case historyPath != "" && isHistoric:
++		history, err = MigrateLegacy(historyPath)
+ 		if err != nil {
+ 			return err
+ 		}
+ 		forkReason = "legacy_fork"
+ 		parentID = history.ID
+ 
+-	case historyFile != "":
+-		history, err = LoadHistory(historyFile)
++	case historyPath != "":
++		history, err = LoadHistory(historyPath)
+ 		if err != nil {
+ 			return err
+ 		}
+@@ -98,8 +102,7 @@ func (a *App) Converse(conversationName, promptFile, settingsFile, historyFile,
+ 	}
+ 
+ 	// Load attachments
+-	attachPaths := c.StringSlice("attach")
+-	for _, ap := range attachPaths {
++	for _, ap := range attachments {
+ 		att, err := LoadAttachment(ap)
+ 		if err != nil {
+ 			return err
+@@ -142,3 +145,126 @@ func (a *App) Converse(conversationName, promptFile, settingsFile, historyFile,
+ 
+ 	return nil
+ }
++
++// Regenerate regenerates a history file to remove its thought
++// signatures.
++func (a *App) Regenerate(inputPath string) error {
++
++	history, err := LoadHistory(inputPath)
++	if err != nil {
++		return err
++	}
++
++	// Perform stripping
++	StripSignatures(history)
++
++	// Update Metadata
++	ts := time.Now().Format(timeFormat)
++	history.ParentID = history.ID
++	history.ID = ts
++	history.ForkReason = "strip_signatures"
++
++	// Save to same dir with new timestamp
++	dir := filepath.Dir(inputPath)
++	newPath := filepath.Join(dir, fmt.Sprintf("%s_history.json", ts))
++
++	bytes, _ := history.Serialize()
++	if err := os.WriteFile(newPath, bytes, 0644); err != nil {
++		return err
++	}
++
++	fmt.Printf("Stripped signatures. New file: %s\n", newPath)
++	return nil
++}
++
++// ParseFiles does a one-shot analysis of the attachments for OCR-type
++// extraction using Gemini, using the instructions in the prompt file.
++func (a *App) ParseFiles(ctx context.Context, settingsPath, promptPath string, attachments []string) error {
++
++	settings, err := LoadYaml(settingsPath)
++	if err != nil {
++		return err
++	}
++
++	// Setup "files" directory structure
++	paths, err := NewFilePaths("", "parsed", true) // "parsed" is a generic bucket name in files/
++	if err != nil {
++		return err
++	}
++
++	// Prepare User Turn (No History)
++	promptBytes, err := os.ReadFile(promptPath)
++	if err != nil {
++		return err
++	}
++
++	userTurn := Turn{
++		Role:      "user",
++		TextParts: []string{string(promptBytes)},
++		Timestamp: time.Now(),
++	}
++
++	for _, f := range attachments {
++		att, err := LoadAttachment(f)
++		if err != nil {
++			return err
++		}
++		userTurn.Attachments = append(userTurn.Attachments, att)
++	}
++
++	fmt.Println("Parsing file(s)...")
++	// Pass nil history
++	modelTurn, _, err := GenerateResponse(ctx, settings, nil, userTurn)
++	if err != nil {
++		return err
++	}
++
++	// Write Output
++	fullOutput := strings.Join(modelTurn.TextParts, "\n\n")
++	if err := os.WriteFile(paths.ResponseFile, []byte(fullOutput), 0644); err != nil {
++		return err
++	}
++
++	// Do not save history.json for parsefile, only save response
++	// markdown.
++	fmt.Printf("Output saved to %s\n", paths.ResponseFile)
++	return nil
++
++}
++
++// Lineage reports on the lineage of a conversation.
++func (a *App) Lineage(conversation string) error {
++	paths, err := NewFilePaths("", conversation, false)
++	if err != nil {
++		return err
++	}
++
++	files, err := ScanForLineage(paths.ChatDir)
++	if err != nil {
++		return err
++	}
++
++	if len(files) == 0 {
++		fmt.Println("No history found.")
++		return nil
++	}
++
++	// Simple output
++	fmt.Printf("Lineage for %s:\n", conversation)
++	fmt.Println("ID                  | Parent              | Reason             | Model          | Tokens")
++	fmt.Println("---------------------------------------------------------------------------------------")
++	for _, f := range files {
++		parent := f.ParentID
++		if len(parent) > 15 {
++			parent = "..." + parent[len(parent)-12:]
++		}
++		if parent == "" {
++			parent = "root"
++		}
++
++		fmt.Printf("%-19s | %-19s | %-18s | %-14s | %d\n",
++			f.ID, parent, f.ForkReason, f.OriginalModel, f.TotalTokens)
++	}
++
++	return nil
++}
+diff --git a/main.go b/main.go
+index 083488c..28c3390 100644
+--- a/main.go
++++ b/main.go
+@@ -4,338 +4,12 @@ import (
+ 	"context"
+ 	"fmt"
+ 	"os"
+-	"strings"
+-	"time"
+-
+-	"path/filepath"
+-
+-	"github.com/urfave/cli/v3"
+ )
+ 
+ func main() {
+-	cmd := &cli.Command{
+-		Name:    "genact",
+-		Version: "v0.1.0-gemini3",
+-		Usage:   "Interact with Google Gemini 3.0",
+-		Commands: []*cli.Command{
+-			// ---------------------------------------------------------
+-			// CONVERSE
+-			// ---------------------------------------------------------
+-			{
+-				Name:    "converse",
+-				Aliases: []string{"c"},
+-				Usage:   "Converse with the model (stateful)",
+-				Flags: []cli.Flag{
+-					&cli.StringFlag{Name: "conversation", Aliases: []string{"c"}, Usage: "Conversation name", Required: true},
+-					&cli.BoolFlag{Name: "new", Aliases: []string{"n"}, Usage: "Force new conversation"},
+-					&cli.StringFlag{Name: "history", Aliases: []string{"j", "jsonHistory"}, Usage: "Explicit path to a history file to fork from"},
+-					&cli.BoolFlag{Name: "old-history", Aliases: []string{"o"}, Usage: "Import from legacy 0.0.4 format"},
+-					&cli.StringSliceFlag{Name: "attach", Aliases: []string{"a"}, Usage: "Attach files (e.g. -a doc.pdf)"},
+-					&cli.StringFlag{Name: "thinking", Aliases: []string{"t"}, Value: "high", Usage: "Thinking level (low|high)"},
+-					&cli.StringFlag{Name: "settings", Aliases: []string{"y"}, Value: "settings.yaml", Usage: "Path to settings file"},
+-				},
+-				ArgsUsage: "[prompt_file]",
+-				Action: func(ctx context.Context, c *cli.Command) error {
+-					promptPath := c.Args().First()
+-					if promptPath == "" {
+-						return fmt.Errorf("prompt file argument is required")
+-					}
+-
+-					// 1. Load Settings
+-					settings, err := LoadYaml(c.String("settings"))
+-					if err != nil {
+-						return err
+-					}
+-					// Override settings with flags
+-					settings.ThinkingLevel = c.String("thinking")
+-
+-					// 2. Setup Paths
+-					chatName := c.String("conversation")
+-					paths, err := NewFilePaths("", chatName, false)
+-					if err != nil {
+-						return err
+-					}
+-
+-					// 3. Resolve History
+-					var history *HistoryFile
+-					var forkReason string
+-					var parentID string
+-
+-					explicitHistory := c.String("history")
+-					isLegacy := c.Bool("old-history")
+-					forceNew := c.Bool("new")
+-
+-					if forceNew {
+-						// Start fresh
+-						forkReason = "new"
+-					} else if explicitHistory != "" {
+-						// Fork from specific file
+-						if isLegacy {
+-							history, err = MigrateLegacy(explicitHistory)
+-							if err != nil {
+-								return err
+-							}
+-							forkReason = "legacy_fork"
+-						} else {
+-							history, err = LoadHistory(explicitHistory)
+-							if err != nil {
+-								return err
+-							}
+-							forkReason = "branch"
+-						}
+-						// If forking, we define the PARENT as the ID of the loaded file
+-						parentID = history.ID
+-					} else {
+-						// Auto-continue latest
+-						latest, err := FindLatestHistory(paths.ChatDir)
+-						if err != nil {
+-							return err
+-						}
+-						if latest != "" {
+-							history, err = LoadHistory(latest)
+-							if err != nil {
+-								return fmt.Errorf("failed to load previous history: %w", err)
+-							}
+-							parentID = history.ID
+-							forkReason = "reply"
+-						} else {
+-							forkReason = "new"
+-						}
+-					}
+-
+-					// 4. Create New ID for this session
+-					sessionID := paths.Timestamp
+-
+-					// If history exists, we technically prepare a 'new' history object based on it
+-					// but we only populate the Previous Turns for the API call.
+-					if history == nil {
+-						history = &HistoryFile{
+-							ID:            sessionID,
+-							ParentID:      "",
+-							ForkReason:    "new",
+-							OriginalModel: settings.ModelName,
+-							Turns:         []Turn{},
+-						}
+-					} else {
+-						// Prepare for next step
+-						// We don't modify 'history' in place yet, we pass it to API
+-					}
+-
+-					// 5. Prepare User Turn
+-					promptBytes, err := os.ReadFile(promptPath)
+-					if err != nil {
+-						return err
+-					}
+-
+-					userTurn := Turn{
+-						Role:      "user",
+-						TextParts: []string{string(promptBytes)},
+-						Timestamp: time.Now(),
+-					}
+-
+-					// Load attachments
+-					attachPaths := c.StringSlice("attach")
+-					for _, ap := range attachPaths {
+-						att, err := LoadAttachment(ap)
+-						if err != nil {
+-							return err
+-						}
+-						userTurn.Attachments = append(userTurn.Attachments, att)
+-					}
+-
+-					// 6. API Call
+-					fmt.Printf("Generating response using %s...\n", settings.ModelName)
+-					modelTurn, tokenCount, err := GenerateResponse(ctx, settings, history, userTurn)
+-					if err != nil {
+-						return err
+-					}
+-
+-					// 7. Update History & Save
+-					// We create a NEW history file that contains:
+-					// [Ancestors] + [UserTurn] + [ModelTurn]
+-					newHistory := history.DeepCopy(sessionID, forkReason)
+-					newHistory.ParentID = parentID
+-					newHistory.OriginalModel = settings.ModelName
+-					newHistory.TotalTokens = tokenCount
+-					newHistory.Turns = append(newHistory.Turns, userTurn, *modelTurn)
+-
+-					historyBytes, _ := newHistory.Serialize()
+-					if err := os.WriteFile(paths.HistoryFile, historyBytes, 0644); err != nil {
+-						return err
+-					}
+-
+-					// 8. Write Outputs
+-					fullOutput := strings.Join(modelTurn.TextParts, "\n\n")
+-					if modelTurn.Thought != "" {
+-						fullOutput = fmt.Sprintf("<details><summary>Thinking</summary>\n\n%s\n\n</details>\n\n%s", modelTurn.Thought, fullOutput)
+-					}
+-
+-					os.WriteFile(paths.ResponseFile, []byte(fullOutput), 0644)
+-					os.WriteFile(paths.PromptFile, promptBytes, 0644) // Save snapshot of prompt
+-
+-					fmt.Printf("Done. Saved to %s\n", paths.HistoryFile)
+-					return nil
+-				},
+-			},
+-
+-			// ---------------------------------------------------------
+-			// REGEN / STRIP
+-			// ---------------------------------------------------------
+-			{
+-				Name:    "regen",
+-				Aliases: []string{"strip", "r"},
+-				Usage:   "Regenerate a history file with no thought signatures",
+-				Flags: []cli.Flag{
+-					&cli.StringFlag{Name: "apiHistory", Aliases: []string{"a"}, Required: true, Usage: "History file to strip"},
+-				},
+-				Action: func(ctx context.Context, c *cli.Command) error {
+-					inputPath := c.String("apiHistory")
+-					history, err := LoadHistory(inputPath)
+-					if err != nil {
+-						return err
+-					}
+-
+-					// Perform stripping
+-					StripSignatures(history)
+ 
+-					// Update Metadata
+-					ts := time.Now().Format(timeFormat)
+-					history.ParentID = history.ID
+-					history.ID = ts
+-					history.ForkReason = "strip_signatures"
+-
+-					// Save to same dir with new timestamp
+-					dir := filepath.Dir(inputPath)
+-					newPath := filepath.Join(dir, fmt.Sprintf("%s_history.json", ts))
+-
+-					bytes, _ := history.Serialize()
+-					if err := os.WriteFile(newPath, bytes, 0644); err != nil {
+-						return err
+-					}
+-
+-					fmt.Printf("Stripped signatures. New file: %s\n", newPath)
+-					return nil
+-				},
+-			},
+-
+-			// ---------------------------------------------------------
+-			// PARSEFILE
+-			// ---------------------------------------------------------
+-			{
+-				Name:    "parsefile",
+-				Aliases: []string{"p"},
+-				Usage:   "One-shot analysis of files (saved to files/ directory)",
+-				Flags: []cli.Flag{
+-					&cli.StringSliceFlag{Name: "file", Aliases: []string{"f"}, Required: true, Usage: "Files to attach"},
+-					&cli.StringFlag{Name: "settings", Aliases: []string{"y"}, Value: "settings.yaml", Usage: "Path to settings file"},
+-				},
+-				ArgsUsage: "[prompt_file]",
+-				Action: func(ctx context.Context, c *cli.Command) error {
+-					promptPath := c.Args().First()
+-					if promptPath == "" {
+-						return fmt.Errorf("prompt file argument is required")
+-					}
+-
+-					settings, err := LoadYaml(c.String("settings"))
+-					if err != nil {
+-						return err
+-					}
+-
+-					// Setup "files" directory structure
+-					paths, err := NewFilePaths("", "parsed", true) // "parsed" is a generic bucket name in files/
+-					if err != nil {
+-						return err
+-					}
+-
+-					// Prepare User Turn (No History)
+-					promptBytes, err := os.ReadFile(promptPath)
+-					if err != nil {
+-						return err
+-					}
+-
+-					userTurn := Turn{
+-						Role:      "user",
+-						TextParts: []string{string(promptBytes)},
+-						Timestamp: time.Now(),
+-					}
+-
+-					for _, f := range c.StringSlice("file") {
+-						att, err := LoadAttachment(f)
+-						if err != nil {
+-							return err
+-						}
+-						userTurn.Attachments = append(userTurn.Attachments, att)
+-					}
+-
+-					fmt.Println("Parsing file(s)...")
+-					// Pass nil history
+-					modelTurn, _, err := GenerateResponse(ctx, settings, nil, userTurn)
+-					if err != nil {
+-						return err
+-					}
+-
+-					// Write Output
+-					fullOutput := strings.Join(modelTurn.TextParts, "\n\n")
+-					if err := os.WriteFile(paths.ResponseFile, []byte(fullOutput), 0644); err != nil {
+-						return err
+-					}
+-
+-					// We DO NOT save history.json for parsefile, as requested,
+-					// but we do save the response markdown.
+-					fmt.Printf("Output saved to %s\n", paths.ResponseFile)
+-					return nil
+-				},
+-			},
+-
+-			// ---------------------------------------------------------
+-			// LINEAGE
+-			// ---------------------------------------------------------
+-			{
+-				Name:    "lineage",
+-				Aliases: []string{"l"},
+-				Usage:   "View the lineage of a conversation",
+-				Flags: []cli.Flag{
+-					&cli.StringFlag{Name: "conversation", Aliases: []string{"c"}, Required: true},
+-				},
+-				Action: func(ctx context.Context, c *cli.Command) error {
+-					chatName := c.String("conversation")
+-					paths, err := NewFilePaths("", chatName, false)
+-					if err != nil {
+-						return err
+-					}
+-
+-					files, err := ScanForLineage(paths.ChatDir)
+-					if err != nil {
+-						return err
+-					}
+-
+-					if len(files) == 0 {
+-						fmt.Println("No history found.")
+-						return nil
+-					}
+-
+-					// Simple output
+-					fmt.Printf("Lineage for %s:\n", chatName)
+-					fmt.Println("ID                  | Parent              | Reason             | Model          | Tokens")
+-					fmt.Println("---------------------------------------------------------------------------------------")
+-					for _, f := range files {
+-						parent := f.ParentID
+-						if len(parent) > 15 {
+-							parent = "..." + parent[len(parent)-12:]
+-						}
+-						if parent == "" {
+-							parent = "ROOT"
+-						}
+-
+-						fmt.Printf("%-19s | %-19s | %-18s | %-14s | %d\n",
+-							f.ID, parent, f.ForkReason, f.OriginalModel, f.TotalTokens)
+-					}
+-
+-					return nil
+-				},
+-			},
+-		},
+-	}
++	app := NewApp()
++	cmd := BuildCLI(app)
+ 
+ 	if err := cmd.Run(context.Background(), os.Args); err != nil {
+ 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+```
+
+Apart from any general comments you may have please don't step through
+your reasoning in a didactic style -- I'd prefer a statement followed by
+justification in a more prose-style, using a more conceptual approach. 
+
+I'd be grateful specifically about:
+
+* my use of the switch statement
+* whether I should move the cli `Before` validation to app.Converse
+  (partly to make input more testable, but also to stop having to call
+  cli.StringFlag -- for example -- several times on the same flag).
+
+If you suggest some corrections, please make them only concise enough to
+express an exemplar.
+
+Thank you!

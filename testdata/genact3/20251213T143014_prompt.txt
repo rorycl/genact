@@ -1,0 +1,26 @@
+Thank you, this is helpful.
+
+Do you have any comments about the use of `ConverseOptions` below, which
+is defined in App, from cli where the cli command calls the interface
+method app.Converse?
+
+I ask because it feels like a dependency on App, even though of course
+all these funcs and structs are in the same namespace.
+
+```go
+		Action: func(ctx context.Context, c *cli.Command) error {
+			return app.Converse(
+				ctx,
+				ConverseOptions{
+					c.String("conversation"),
+					c.Args().First(), // prompt file
+					c.String("settings"),
+					c.String("history"),
+					c.String("thinking"),
+					c.Bool("new"),
+					c.Bool("old-history"),
+					c.StringSlice("attach"),
+				},
+			)
+		},
+```
