@@ -1,9 +1,12 @@
 genact
-cmd/cli/settings.yaml
-cmd/cli/genact
-cmd/thinner/thinner
+settings.yaml
 bin/*
 cover*
+
+# example output
+conversations/
+output.md
+prompt.txt
 
 # interactive test environment
 genesis
