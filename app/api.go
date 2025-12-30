@@ -24,7 +24,7 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
 	var contents []*genai.Content
 
 	// Count the conversation turns.
-	var turns int = 0
+	var turns = 0
 
 	// Add any previous history
 	if history != nil {
@@ -93,7 +93,7 @@ func GenerateResponse(ctx context.Context, settings Settings, history *HistoryFi
 			level = genai.ThinkingLevelLow
 		}
 		thinkingConfig = &genai.ThinkingConfig{
-			IncludeThoughts: true,
+			IncludeThoughts: false, // do not show thoughts in the output
 			ThinkingLevel:   level,
 		}
 	}

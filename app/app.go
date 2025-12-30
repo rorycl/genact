@@ -49,12 +49,12 @@ func (c ConverseOptions) Validate() error {
 		return errors.New("conversation name `-c` cannot be empty")
 	}
 
-	if !filechk.IfNotEmptyAndIsFile(c.HistoryPath) {
+	if c.HistoryPath != "" && !filechk.IsFile(c.HistoryPath) {
 		return fmt.Errorf("history file %q not found", c.HistoryPath)
 	}
 
 	for _, a := range c.Attachments {
-		if filechk.IsFile(a) == false {
+		if !filechk.IsFile(a) {
 			return fmt.Errorf("attachment %q not found", a)
 		}
 	}
@@ -125,6 +125,7 @@ func (a *App) Converse(ctx context.Context, cfg ConverseOptions) error {
 		}
 		if latest == "" {
 			history = initHistory()
+			break
 		}
 		history, err = LoadHistory(latest)
 		if err != nil {
@@ -163,6 +164,7 @@ func (a *App) Converse(ctx context.Context, cfg ConverseOptions) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("Token count: %d", tokenCount)
 
 	// Update History and Save, creating a new history
 	// file with:
@@ -185,9 +187,18 @@ func (a *App) Converse(ctx context.Context, cfg ConverseOptions) error {
 		fullOutput = fmt.Sprintf("<details><summary>Thinking</summary>\n\n%s\n\n</details>\n\n%s", modelTurn.Thought, fullOutput)
 	}
 
-	os.WriteFile(paths.ResponseFile, []byte(fullOutput), 0644)
-	os.WriteFile(paths.LocalResponseFile, []byte(fullOutput), 0644) // save snapshot of output
-	os.WriteFile(paths.PromptFile, promptBytes, 0644)               // save snapshot of prompt
+	err = os.WriteFile(paths.ResponseFile, []byte(fullOutput), 0644)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(paths.LocalResponseFile, []byte(fullOutput), 0644) // save snapshot of output
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(paths.PromptFile, promptBytes, 0644) // save snapshot of prompt
+	if err != nil {
+		return err
+	}
 
 	log.Printf("Done. Saved to %s\n", paths.HistoryFile)
 

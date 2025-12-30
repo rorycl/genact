@@ -92,12 +92,12 @@ func NewFilePaths(baseDir, chatName string, isNewChat, isParseFile bool) (*FileP
 	// the directory should not exist. For continuing conversations
 	// (without the isNewChat flag), the directory should exist.
 	stat, err := os.Stat(fullChatDir)
-	var pe fs.PathError
+	var pathError *fs.PathError
 	switch {
-	case isNewChat && !errors.As(err, &pe):
+	case isNewChat && !errors.As(err, &pathError):
 		return nil, fmt.Errorf("directory %q already exists", fullChatDir)
-	case !isNewChat && errors.Is(err, &pe):
-		return nil, fmt.Errorf("chat %q not initialised; used 'new'", chatName)
+	case !isNewChat && errors.As(err, &pathError):
+		return nil, fmt.Errorf("chat %q does not exist; use '--new/-n'", chatName)
 	case !isNewChat && !stat.IsDir():
 		return nil, fmt.Errorf("%q is not a directory", fullChatDir)
 	}
