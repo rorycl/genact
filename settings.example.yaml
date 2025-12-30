@@ -1,0 +1,4 @@
+---
+modelName  : "gemini-3-pro-preview"
+apiKey     : "YOuR_API_KEY"
+logging    : true
