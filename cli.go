@@ -9,10 +9,10 @@ import (
 
 const (
 	ShortUsage      = "A cli program for interacting with Gemini 3 series LLMs"
-	LongDescription = `The genact program uses a local settings and
-   prompt file to 'converse' with the LLM. Additional facilities are
-   provided for one-shot file parsing, history regeneration and history
-   lineage reporting.`
+	LongDescription = `The genact program uses a local settings and prompt file to
+   'converse' with the LLM. Additional facilities are provided for
+   one-shot file parsing, history regeneration and history lineage
+   reporting.`
 )
 
 // Applicator is an interface to the central coordinator for the project
@@ -166,4 +166,5 @@ DESCRIPTION:
 COMMANDS:
 {{range .Commands}}   {{.Name}}{{ "\t"}}{{.Usage}}
 {{end}}
-Run '{{.Name}} [command] --help' for more information on a command.`
+Run '{{.Name}} [command] --help' for more information on a command.
+`
