@@ -5,6 +5,9 @@ Version v0.0.4
 A golang module and command line programs to interact with Google's
 Gemini large context window LLMs.
 
+> [!NOTE]
+> Gemini 3 support is on the [gemini3 branch](https://github.com/rorycl/genact/tree/gemini3).
+
 The two cli programmes provided are:
 
 * `genact`\
