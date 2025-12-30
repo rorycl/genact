@@ -8,17 +8,17 @@ func IsFile(path string) bool {
 	if err != nil {
 		return false
 	}
-	if o.IsDir() == true {
+	if o.IsDir() {
 		return false
 	}
 	return true
 }
 
-// IfNotEmptyAndIsFile returns false if a path is empty ("") else if the
+// IfNotEmptyAndIsFile returns true if a path is empty ("") else if the
 // file exists.
 func IfNotEmptyAndIsFile(path string) bool {
 	if path == "" {
-		return false
+		return true
 	}
 	return IsFile(path)
 }
