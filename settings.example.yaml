@@ -2,3 +2,10 @@
 modelName  : "gemini-3-pro-preview"
 apiKey     : "YOuR_API_KEY"
 logging    : true
+
+# skipAnonymisation: false
+
+# A set of golang regexps check inputs are properly anonymised.
+anonymisationChecks:
+  - 'rabbit'
+  - '(?i)\bbSd\b'
