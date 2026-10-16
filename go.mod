@@ -3,8 +3,7 @@ module genact
 go 1.27
 
 require (
-	github.com/dslipak/pdf v0.0.2
-	github.com/fumiama/go-docx v0.0.0-20250506085032-0c30fd09304b
+	github.com/gen2brain/go-fitz v1.28.2
 	github.com/urfave/cli/v3 v3.14.0
 	google.golang.org/genai v1.75.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -15,8 +14,8 @@ require (
 	cloud.google.com/go/auth v0.24.1 // indirect
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
-	github.com/fumiama/imgsz v0.0.2 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
