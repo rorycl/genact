@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"genact/internal/filechk"
+	"genact/internal/isanon"
 )
 
 // App represents the main gathering point of the application, bringing
@@ -25,14 +26,15 @@ func NewApp() *App {
 
 // ConversationOptions are the options to pass to Converse.
 type ConverseOptions struct {
-	ConversationName string
-	PromptPath       string
-	SettingsPath     string
-	HistoryPath      string
-	ThinkingLevel    string
-	IsNew            bool
-	IsLegacyHistory  bool
-	Attachments      []string
+	ConversationName        string
+	PromptPath              string
+	SettingsPath            string
+	HistoryPath             string
+	SkipAnonymisationChecks bool
+	ThinkingLevel           string
+	IsNew                   bool
+	IsLegacyHistory         bool
+	Attachments             []string
 }
 
 // Validate validates the options.
@@ -71,6 +73,22 @@ func (a *App) Converse(ctx context.Context, cfg ConverseOptions) error {
 	settings, err := LoadYaml(cfg.SettingsPath)
 	if err != nil {
 		return err
+	}
+
+	// Load prompt
+	promptBytes, err := os.ReadFile(cfg.PromptPath)
+	if err != nil {
+		return err
+	}
+
+	// Check anonymisation
+	if !cfg.SkipAnonymisationChecks {
+		if len(settings.AnonymisationChecks) == 0 {
+			return errors.New("No anonymisation regexes are provided in settings. Add some, or use the skipAnonymisationChecks option.")
+		}
+		if err := isanon.IsAnonymous(string(promptBytes), cfg.Attachments, settings.AnonymisationChecks); err != nil {
+			return fmt.Errorf("anonymisation error: %w", err)
+		}
 	}
 
 	// Override thinkingLevel in settings based on config.
@@ -139,10 +157,6 @@ func (a *App) Converse(ctx context.Context, cfg ConverseOptions) error {
 	sessionID := paths.Timestamp
 
 	// Prepare User Turn
-	promptBytes, err := os.ReadFile(cfg.PromptPath)
-	if err != nil {
-		return err
-	}
 	userTurn := Turn{
 		Role:      "user",
 		TextParts: []string{string(promptBytes)},
