@@ -26,9 +26,9 @@ func (i InputLineMatch) Error() string {
 	return fmt.Sprintf("source %q page %d line %d matched %q: %s", i.source, i.page, i.line, i.pattern, i.content)
 }
 
-// ErrorFileTypeNotSupported reports if a provided file is supported by the underlying
+// errorFileTypeNotSupported reports if a provided file is supported by the underlying
 // parser library (currently go-fitz).
-var ErrorFileTypeNotSupported error = errors.New("file type not supported")
+var errorFileTypeNotSupported error = errors.New("file type not supported")
 
 // compileRegexps compiles regular expressions from the provided patterns.
 func compileRegexps(patterns []string) ([]*regexp.Regexp, error) {
@@ -71,7 +71,7 @@ func checkFileAnonymous(filePath string, checkers []*regexp.Regexp) error {
 
 	doc, err := fitz.New(filePath)
 	if err != nil {
-		return ErrorFileTypeNotSupported
+		return errorFileTypeNotSupported
 	}
 
 	for page := 0; page < doc.NumPage(); page++ {
@@ -98,7 +98,7 @@ func checkFileAnonymous(filePath string, checkers []*regexp.Regexp) error {
 // IsAnonymous returns an error if the provided patterns are invalid regexps, or if
 // the provided string contains any regexp matches, or if the contents of supported
 // filetypes contains any regexp matches.
-func IsAnonymous(source, input string, filePaths []string, patterns []string) error {
+func IsAnonymous(input string, filePaths []string, patterns []string) error {
 
 	checkers, err := compileRegexps(patterns)
 	if err != nil {
@@ -118,7 +118,8 @@ func IsAnonymous(source, input string, filePaths []string, patterns []string) er
 	}
 	for _, fp := range filePaths {
 		err := checkFileAnonymous(fp, checkers)
-		if errors.Is(ErrorFileTypeNotSupported, err) {
+		if errors.Is(errorFileTypeNotSupported, err) {
+			// consider reporting to console
 			continue
 		}
 		if err != nil {

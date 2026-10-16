@@ -89,7 +89,7 @@ func TestFileIsAnon(t *testing.T) {
 		{
 			source:   "testdata/image.heic",
 			patterns: []*regexp.Regexp{regexp.MustCompile(`some content`)},
-			err:      ErrorFileTypeNotSupported,
+			err:      errorFileTypeNotSupported,
 		},
 	}
 
@@ -105,7 +105,7 @@ func TestFileIsAnon(t *testing.T) {
 			}
 			if err != nil {
 
-				if errors.Is(err, ErrorFileTypeNotSupported) && errors.Is(tt.err, ErrorFileTypeNotSupported) {
+				if errors.Is(err, errorFileTypeNotSupported) && errors.Is(tt.err, errorFileTypeNotSupported) {
 					return
 				}
 				_, got := errors.AsType[InputLineMatch](err)
@@ -159,7 +159,7 @@ func TestIsAnon(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
 
-			err := IsAnonymous("prompt", tt.prompt, tt.files, tt.patterns)
+			err := IsAnonymous(tt.prompt, tt.files, tt.patterns)
 			if err == nil && tt.err != nil {
 				t.Fatalf("expected err: %v", tt.err)
 			}
