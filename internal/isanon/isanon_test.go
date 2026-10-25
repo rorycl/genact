@@ -53,7 +53,7 @@ func TestStrIsAnon(t *testing.T) {
 				if got != want {
 					t.Errorf("got error type %T expected %T", err, tt.err)
 				}
-				// fmt.Printf("%T %#v", err, err)
+				t.Logf("%T %#v", err, err)
 			}
 		})
 	}
@@ -113,7 +113,7 @@ func TestFileIsAnon(t *testing.T) {
 				if got != want {
 					t.Errorf("got error type %T expected %T", err, tt.err)
 				}
-				// t.Logf("%T %#v\n", err, err)
+				t.Logf("%T %#v\n", err, err)
 			}
 		})
 	}
@@ -172,7 +172,7 @@ func TestIsAnon(t *testing.T) {
 				if got != want {
 					t.Errorf("got error type %T expected %T", err, tt.err)
 				}
-				// t.Logf("%T %#v", err, err)
+				t.Logf("%T %#v", err, err)
 			}
 		})
 	}

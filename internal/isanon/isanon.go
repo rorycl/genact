@@ -23,7 +23,7 @@ type InputLineMatch struct {
 }
 
 func (i InputLineMatch) Error() string {
-	return fmt.Sprintf("source %q page %d line %d matched %q: %s", i.source, i.page, i.line, i.pattern, i.content)
+	return fmt.Sprintf("source %q page %d line %d matched '%s': %s", i.source, i.page, i.line, i.pattern, i.content)
 }
 
 // errorFileTypeNotSupported reports if a provided file is supported by the underlying
@@ -36,7 +36,7 @@ func compileRegexps(patterns []string) ([]*regexp.Regexp, error) {
 	for _, p := range patterns {
 		r, err := regexp.Compile(p)
 		if err != nil {
-			return nil, fmt.Errorf("pattern %q could not compile: %s", p, err)
+			return nil, fmt.Errorf("pattern '%s' could not compile: %s", p, err)
 		}
 		rgs = append(rgs, r)
 	}
